@@ -1,0 +1,139 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "LightElf Laser",
+        "description": "Connect through Home Assistant Bluetooth.",
+        "data": {
+          "name": "Name",
+          "address": "Bluetooth address",
+          "timeout": "Timeout"
+        }
+      },
+      "bluetooth_confirm": {
+        "title": "LightElf Laser",
+        "description": "Set up {name} using Home Assistant Bluetooth."
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to the laser."
+    },
+    "abort": {
+      "already_configured": "This laser is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Upload SVG",
+        "description": "Upload an SVG file to the LightElf Laser SVG library. The file is saved under Home Assistant local media and selected automatically.",
+        "data": {
+          "svg_file": "SVG file"
+        }
+      }
+    },
+    "error": {
+      "invalid_svg": "The uploaded file was not a valid SVG."
+    }
+  },
+  "services": {
+    "draw_svg": {
+      "name": "Draw SVG",
+      "description": "Draw an SVG from the laser's SVG drop folder.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Optional config entry id when more than one laser is set up."
+        },
+        "file": {
+          "name": "SVG file",
+          "description": "Filename in the SVG drop folder. Defaults to the currently selected SVG."
+        }
+      }
+    },
+    "draw_text": {
+      "name": "Draw text",
+      "description": "Draw vector (Hershey) text on the laser.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Optional config entry id when more than one laser is set up."
+        },
+        "text": {
+          "name": "Text",
+          "description": "Message to draw. Defaults to the current Text entity value."
+        },
+        "font": {
+          "name": "Font",
+          "description": "Hershey font name."
+        },
+        "color": {
+          "name": "Color",
+          "description": "Beam color."
+        },
+        "size": {
+          "name": "Size",
+          "description": "Cap height in projector units (auto-scaled to fit)."
+        },
+        "vertical_position": {
+          "name": "Vertical position",
+          "description": "Vertical offset over the midline (+ up / - down)."
+        }
+      }
+    },
+    "draw_shape": {
+      "name": "Draw shape",
+      "description": "Draw a built-in static shape.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Optional config entry id when more than one laser is set up."
+        },
+        "family": {
+          "name": "Family",
+          "description": "Built-in shape family."
+        },
+        "index": {
+          "name": "Index",
+          "description": "Zero-based shape index within the selected family."
+        },
+        "color": {
+          "name": "Color",
+          "description": "Use original to preserve stored colors, or choose a beam color."
+        }
+      }
+    },
+    "play_animation": {
+      "name": "Play animation",
+      "description": "Play a firmware-native animation or effect.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Optional config entry id when more than one laser is set up."
+        },
+        "family": {
+          "name": "Family",
+          "description": "Animation family."
+        },
+        "index": {
+          "name": "Index",
+          "description": "One-based animation index within the selected family."
+        },
+        "speed": {
+          "name": "Speed",
+          "description": "Animation speed from 1 to 100."
+        }
+      }
+    },
+    "query_device": {
+      "name": "Query device",
+      "description": "Return the latest decoded device state.",
+      "fields": {
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Optional config entry id when more than one laser is set up."
+        }
+      }
+    }
+  }
+}

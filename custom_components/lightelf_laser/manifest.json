@@ -1,0 +1,18 @@
+{
+  "domain": "lightelf_laser",
+  "name": "LightElf Laser",
+  "after_dependencies": ["bluetooth"],
+  "dependencies": ["file_upload"],
+  "bluetooth": [
+    {"service_uuid": "0000ff00-0000-1000-8000-00805f9b34fb"},
+    {"service_uuid": "0000ffe0-0000-1000-8000-00805f9b34fb"}
+  ],
+  "codeowners": ["@aderusha"],
+  "config_flow": true,
+  "documentation": "https://github.com/aderusha/lightelf_laser",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/aderusha/lightelf_laser/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

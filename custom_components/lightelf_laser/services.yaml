@@ -1,0 +1,109 @@
+draw_svg:
+  fields:
+    entry_id:
+      selector:
+        text:
+    file:
+      selector:
+        text:
+
+draw_text:
+  fields:
+    entry_id:
+      selector:
+        text:
+    text:
+      selector:
+        text:
+    font:
+      selector:
+        text:
+    color:
+      selector:
+        select:
+          options:
+            - rainbow
+            - red
+            - green
+            - blue
+            - yellow
+            - cyan
+            - purple
+            - white
+    size:
+      selector:
+        number:
+          min: 20
+          max: 400
+          mode: box
+    vertical_position:
+      selector:
+        number:
+          min: -300
+          max: 300
+          mode: box
+
+draw_shape:
+  fields:
+    entry_id:
+      selector:
+        text:
+    family:
+      selector:
+        select:
+          options:
+            - Line
+            - Arc
+            - Bright
+            - Dot
+            - Christmas
+    index:
+      selector:
+        number:
+          min: 0
+          max: 77
+          mode: box
+    color:
+      selector:
+        select:
+          options:
+            - original
+            - red
+            - green
+            - blue
+            - yellow
+            - cyan
+            - purple
+            - white
+
+play_animation:
+  fields:
+    entry_id:
+      selector:
+        text:
+    family:
+      selector:
+        select:
+          options:
+            - animation
+            - line
+            - christmas
+            - outdoor
+    index:
+      selector:
+        number:
+          min: 1
+          max: 50
+          mode: box
+    speed:
+      selector:
+        number:
+          min: 1
+          max: 100
+          mode: slider
+
+query_device:
+  fields:
+    entry_id:
+      selector:
+        text:

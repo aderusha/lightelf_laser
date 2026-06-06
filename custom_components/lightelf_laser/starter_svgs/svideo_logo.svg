@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="-2 -2 504 504">
+  <title>S-video heart logo outline</title>
+  <desc>Stroke-only laser SVG. Circles are arc paths starting at top dead center; heart paths start at the top middle crease.</desc>
+
+  <g id="white-geometry" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path id="outer-circle" d="M 250 0 A 250 250 0 1 1 250 500 A 250 250 0 1 1 250 0"/>
+    <path id="inner-keyed-boundary" d="M 191 47.417 L 191 89 L 309 89 L 309 47.417 A 211 211 0 0 1 432.442 356 L 361 356 L 361 429.444 A 211 211 0 0 1 139 429.444 L 139 356 L 67.558 356 A 211 211 0 0 1 191 47.417 Z"/>
+    <path id="upper-left-port-outer" d="M 155.5 102.5 A 47 47 0 1 1 155.5 196.5 A 47 47 0 1 1 155.5 102.5"/>
+    <path id="upper-left-port-inner" d="M 155.5 129.5 A 20 20 0 1 1 155.5 169.5 A 20 20 0 1 1 155.5 129.5"/>
+    <path id="lower-left-port-outer" d="M 110.5 221.5 A 47 47 0 1 1 110.5 315.5 A 47 47 0 1 1 110.5 221.5"/>
+    <path id="lower-left-port-inner" d="M 110.5 248.5 A 20 20 0 1 1 110.5 288.5 A 20 20 0 1 1 110.5 248.5"/>
+    <path id="right-port-outer" d="M 388.5 221.5 A 47 47 0 1 1 388.5 315.5 A 47 47 0 1 1 388.5 221.5"/>
+    <path id="right-port-inner" d="M 388.5 248.5 A 20 20 0 1 1 388.5 288.5 A 20 20 0 1 1 388.5 248.5"/>
+    <path id="bottom-center-rectangle" d="M 172 356 L 328 356 L 328 433 L 172 433 L 172 356"/>
+  </g>
+
+  <g id="red-heart" fill="none" stroke="#ff0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path id="heart-outer" d="M 345 104 C 341.33 104 337 100.67 333 100 C 329 99.33 324.67 99.5 321 100 C 317.33 100.5 314.67 101 311 103 C 307.33 105 302.33 108 299 112 C 295.67 116 292.5 122 291 127 C 289.5 132 289.67 137.83 290 142 C 290.33 146.17 291.33 148.67 293 152 C 294.67 155.33 291.5 153 300 162 C 308.5 171 329 206.33 344 206 C 359 205.67 381.17 170 390 160 C 398.83 150 395.67 150.67 397 146 C 398.33 141.33 398.83 137 398 132 C 397.17 127 395.17 120.5 392 116 C 388.83 111.5 383.17 107.67 379 105 C 374.83 102.33 371 100.83 367 100 C 363 99.17 358.67 99.33 355 100 C 351.33 100.67 348.67 104 345 104 Z"/>
+    <path id="heart-inner" d="M 343 132 C 346.67 132.17 350.5 127.33 354 126 C 357.5 124.67 361.17 123.5 364 124 C 366.83 124.5 369.33 126.83 371 129 C 372.67 131.17 373.83 134.67 374 137 C 374.17 139.33 377 137.33 372 143 C 367 148.67 353.33 171 344 171 C 334.67 171 321 149 316 143 C 311 137 314 137.17 314 135 C 314 132.83 315 131.5 316 130 C 317 128.5 318.5 127 320 126 C 321.5 125 323 124.17 325 124 C 327 123.83 329 123.67 332 125 C 335 126.33 339.33 131.83 343 132 Z"/>
+  </g>
+</svg>
