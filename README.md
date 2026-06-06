@@ -1,11 +1,11 @@
 # LightElf Laser
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://www.hacs.xyz/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-green)](https://github.com/aderusha/lightelf_laser/blob/main/LICENSE)
 ![Local Bluetooth](https://img.shields.io/badge/Control-Local%20Bluetooth-blue.svg)
 
 Home Assistant custom integration for LightElf-compatible BLE RGB laser
-projectors, including devices sold as Eytse EY003-L / LightElf RGB laser.
+projectors, such as [this inexpensive example on Amazon](https://amzn.to/4uU93oj) <sup>(*affiliate link*)</sup>.
 
 This integration runs locally through Home Assistant's native Bluetooth stack, no cloud service or mobile app required for setup nor operation.
 
