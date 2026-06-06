@@ -12,7 +12,14 @@ from homeassistant.components.number import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import TEXT_SIZE_MAX, TEXT_SIZE_MIN, TEXT_Y_MAX, TEXT_Y_MIN
+from .const import (
+    SOUND_SENSITIVITY_MAX,
+    SOUND_SENSITIVITY_MIN,
+    TEXT_SIZE_MAX,
+    TEXT_SIZE_MIN,
+    TEXT_Y_MAX,
+    TEXT_Y_MIN,
+)
 from .coordinator import EytseLaserConfigEntry
 from .entity import EytseLaserEntity
 
@@ -97,7 +104,11 @@ async def async_setup_entry(
 ) -> None:
     """Set up number entities."""
     coordinator = config_entry.runtime_data
-    async_add_entities(EytseNumber(coordinator, description) for description in NUMBERS)
+    entities: list[NumberEntity] = [
+        EytseNumber(coordinator, description) for description in NUMBERS
+    ]
+    entities.append(EytseSoundSensitivityNumber(coordinator))
+    async_add_entities(entities)
 
 
 class EytseNumber(EytseLaserEntity, NumberEntity):
@@ -152,3 +163,36 @@ class EytseNumber(EytseLaserEntity, NumberEntity):
             )
         setattr(self.coordinator, self.entity_description.attr, value)
         self.coordinator.async_update_listeners()
+
+
+class EytseSoundSensitivityNumber(EytseLaserEntity, NumberEntity):
+    """Onboard-mic sensitivity for sound-reactive ("Music") playback.
+
+    Persisted in entry.options via the coordinator; re-applied live when sound
+    mode is on and a firmware effect is playing.
+    """
+
+    _attr_name = "Sound sensitivity"
+    _attr_icon = "mdi:microphone"
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_min_value = SOUND_SENSITIVITY_MIN
+    _attr_native_max_value = SOUND_SENSITIVITY_MAX
+    _attr_native_step = 1
+
+    def __init__(self, coordinator) -> None:
+        """Initialize the sensitivity slider."""
+        super().__init__(coordinator, "sound_sensitivity")
+
+    @property
+    def available(self) -> bool:
+        """Editable even when the radio is released (applied on next play)."""
+        return True
+
+    @property
+    def native_value(self) -> float:
+        """Return the current sensitivity."""
+        return int(self.coordinator.sound_sensitivity)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Persist the sensitivity and re-apply if sound mode is active."""
+        await self.coordinator.async_set_sound_sensitivity(int(value))

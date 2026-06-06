@@ -28,6 +28,9 @@ The integration creates a compact Home Assistant control surface:
 - `number.lightelf_laser_animation_speed`: animation speed.
 - `image.lightelf_laser_animation_preview`: captured animation preview.
 - `button.lightelf_laser_play_animation`: show the selected native animation.
+- `switch.lightelf_laser_sound_reactive`: drive the active effect from the
+  onboard microphone instead of a fixed speed.
+- `number.lightelf_laser_sound_sensitivity`: microphone sensitivity (1-100).
 
 Entity IDs may differ if Home Assistant assigns a suffix.
 
@@ -77,3 +80,16 @@ animations run inside the projector firmware; Home Assistant only selects the
 family, index, and speed.
 
 The catalog exposes indices 1 through 50 for each supported family.
+
+## Sound-Reactive Mode
+
+Turn on **Sound reactive** to make the projector drive the currently playing
+firmware effect from its onboard microphone instead of the fixed speed. Adjust
+**Sound sensitivity** (1-100) for the room's volume. No audio is streamed from
+Home Assistant; the reactivity happens entirely inside the projector.
+
+The setting is global and applies to whatever effect is playing, so it pairs
+best with the firmware-native animations. Effects with lots of motion react most
+visibly; static or title-card patterns barely change. If a firmware effect is
+already running when you toggle the switch or change the sensitivity, the effect
+is re-issued so the new setting takes effect immediately.

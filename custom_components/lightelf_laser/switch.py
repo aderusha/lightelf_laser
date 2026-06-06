@@ -23,6 +23,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             EytseConnectionSwitch(coordinator),
+            EytseSoundReactiveSwitch(coordinator),
             EytseInvertAxisSwitch(coordinator, "invert_x", "Invert X", "mdi:axis-x-arrow"),
             EytseInvertAxisSwitch(coordinator, "invert_y", "Invert Y", "mdi:axis-y-arrow"),
         ]
@@ -66,6 +67,45 @@ class EytseConnectionSwitch(EytseLaserEntity, SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Release the radio for another BLE controller."""
         await self.coordinator.async_set_connection(False)
+
+
+class EytseSoundReactiveSwitch(EytseLaserEntity, SwitchEntity):
+    """Make firmware effects react to the projector's onboard microphone.
+
+    On = the playing firmware effect (animation/line/christmas/outdoor) reacts to
+    room sound instead of running at a fixed speed; the sensitivity number sets
+    the mic gain. The setting persists across restarts and is applied the next
+    time an animation plays (or live, if one is already playing).
+    """
+
+    _attr_name = "Sound reactive"
+
+    def __init__(self, coordinator) -> None:
+        """Initialize the sound-reactive switch."""
+        super().__init__(coordinator, "sound_reactive")
+
+    @property
+    def available(self) -> bool:
+        """Editable even when the radio is released (applied on next play)."""
+        return True
+
+    @property
+    def icon(self) -> str:
+        """Icon reflects whether sound-reactive mode is enabled."""
+        return "mdi:music-note" if self.coordinator.sound_reactive else "mdi:music-note-off"
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether sound-reactive playback is enabled."""
+        return self.coordinator.sound_reactive
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable sound-reactive playback."""
+        await self.coordinator.async_set_sound_reactive(True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disable sound-reactive playback."""
+        await self.coordinator.async_set_sound_reactive(False)
 
 
 class EytseInvertAxisSwitch(EytseLaserEntity, SwitchEntity):

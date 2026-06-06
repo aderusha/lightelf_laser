@@ -92,6 +92,17 @@ DEFAULT_NATIVE_ANIMATION_SPEED = 70
 # to benefit from command refresh without visible restarts.
 NATIVE_ANIMATION_LOOP_LOCKS = {}
 
+# Sound-reactive ("Music") playback. The projector has an onboard microphone and
+# a firmware sound-reactive mode: setting the C0 mode command's run-mode byte
+# (field 9) to 255 makes whatever firmware effect is playing react to the room's
+# sound instead of running at a fixed speed, and the sensitivity byte (field 10)
+# sets the mic sensitivity. No host audio streaming is involved. Both settings
+# are persisted in entry.options so they survive a restart.
+DEFAULT_SOUND_REACTIVE = False
+DEFAULT_SOUND_SENSITIVITY = 50
+SOUND_SENSITIVITY_MIN = 1
+SOUND_SENSITIVITY_MAX = 100
+
 # Projector mount-orientation setting values, not host-side coordinate
 # transforms.
 MOUNT_ORIENTATION_OPTIONS = {

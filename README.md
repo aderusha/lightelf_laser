@@ -24,6 +24,8 @@ animations from Home Assistant, with previews before you light the wall.
 - **Firmware scrolling text** without host-side frame streaming.
 - **Built-in static shapes** with live previews.
 - **Firmware-native animations** with captured previews.
+- **Sound-reactive mode** that drives the active effect from the projector's
+  onboard microphone, with an adjustable sensitivity.
 - **BLE Connection Control** so Home Assistant can release the projector for mobile app access.
 
 ## Installation

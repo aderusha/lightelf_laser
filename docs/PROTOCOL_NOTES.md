@@ -74,3 +74,13 @@ then performs the marquee without host-side frame streaming.
 Native animations run inside the projector. The controller selects a mode,
 project family, one-based pattern index, and speed with a C0 mode command. The
 integration exposes the tested 1 through 50 range for supported families.
+
+## Sound-Reactive Mode
+
+The C0 mode command carries a run-mode byte and a sound-sensitivity byte. Setting
+the run-mode byte to `255` puts the projector in sound-reactive ("Music") mode:
+the active effect advances from the onboard microphone level instead of the fixed
+speed value, and the sensitivity byte (a 0-100 percentage scaled to 0-255) sets
+the microphone gain. No audio is streamed from the host; the reactivity is
+entirely firmware-side. The setting is global and applies to whichever effect is
+currently playing.

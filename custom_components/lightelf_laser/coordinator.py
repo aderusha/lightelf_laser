@@ -28,6 +28,8 @@ from .const import (
     DEFAULT_SHAPE_COLOR,
     DEFAULT_TEXT_MESSAGE,
     DEFAULT_SHAPE_FAMILY,
+    DEFAULT_SOUND_REACTIVE,
+    DEFAULT_SOUND_SENSITIVITY,
     DEFAULT_TEXT_COLOR,
     DEFAULT_TEXT_FONT,
     DEFAULT_TEXT_SIZE,
@@ -44,6 +46,8 @@ from .const import (
     PROJECTOR_LIMIT,
     SCROLL_DIRECTIONS,
     SCROLL_UNIT,
+    SOUND_SENSITIVITY_MAX,
+    SOUND_SENSITIVITY_MIN,
     STARTER_SVG_DIR,
     SVG_LEGACY_SUBDIR,
     SVG_MEDIA_SUBDIR,
@@ -183,6 +187,20 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.native_animation_index = DEFAULT_NATIVE_ANIMATION_INDEX
         self.native_animation_speed = DEFAULT_NATIVE_ANIMATION_SPEED
         self._native_animation_catalog: dict[str, dict[int, dict[str, Any]]] = {}
+
+        # Sound-reactive ("Music") playback. When enabled, firmware effects react
+        # to the projector's onboard microphone instead of a fixed speed; the
+        # sensitivity sets the mic gain. Both persist in entry.options. The active
+        # flag tracks whether the last thing displayed is a firmware effect, so
+        # toggling sound mode can re-apply it live without clobbering a static
+        # SVG/shape/text draw.
+        self.sound_reactive = bool(
+            entry.options.get("sound_reactive", DEFAULT_SOUND_REACTIVE)
+        )
+        self.sound_sensitivity = int(
+            entry.options.get("sound_sensitivity", DEFAULT_SOUND_SENSITIVITY)
+        )
+        self._native_animation_active = False
 
         # Projector-global mount orientation. This xy byte controls normal,
         # flipped, and 90-degree rotated output and is read back from query.
@@ -511,11 +529,14 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "family": self.native_animation_family,
                 "pattern": self.native_animation_index,
                 "speed": self.native_animation_speed,
+                "playback": "sound" if self.sound_reactive else "auto",
+                "sound_percent": self.sound_sensitivity,
                 "loop": lock_interval is not None,
                 "lock_interval": lock_interval or 0.75,
             },
         )
         self.is_on = True
+        self._native_animation_active = True
         await self.async_request_refresh()
 
     async def async_display_shape(self) -> None:
@@ -532,6 +553,7 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("power", {"on": True})
         await self.client.request("raw", {"hex": command})
         self.is_on = True
+        self._native_animation_active = False
         await self.async_request_refresh()
 
     @staticmethod
@@ -631,6 +653,43 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             await self.client.request("ble_release")
         await self.async_request_refresh()
 
+    async def async_set_sound_reactive(self, enabled: bool) -> None:
+        """Enable/disable sound-reactive ("Music") firmware playback.
+
+        Persisted in entry.options. If a firmware effect is currently playing,
+        the selected animation is re-issued so the new mode takes effect live.
+        Static SVG/shape/text draws are left untouched.
+        """
+        self.sound_reactive = bool(enabled)
+        self.hass.config_entries.async_update_entry(
+            self.config_entry,
+            options={**self.config_entry.options, "sound_reactive": self.sound_reactive},
+        )
+        await self._reapply_sound_if_playing()
+        self.async_update_listeners()
+
+    async def async_set_sound_sensitivity(self, value: int) -> None:
+        """Set the onboard-mic sensitivity (1-100) for sound-reactive playback."""
+        self.sound_sensitivity = max(
+            SOUND_SENSITIVITY_MIN, min(SOUND_SENSITIVITY_MAX, int(value))
+        )
+        self.hass.config_entries.async_update_entry(
+            self.config_entry,
+            options={
+                **self.config_entry.options,
+                "sound_sensitivity": self.sound_sensitivity,
+            },
+        )
+        # Sensitivity only matters while sound mode is on; re-apply if reactive.
+        if self.sound_reactive:
+            await self._reapply_sound_if_playing()
+        self.async_update_listeners()
+
+    async def _reapply_sound_if_playing(self) -> None:
+        """Re-issue the current firmware animation so sound settings take effect."""
+        if self.is_on and self._native_animation_active and self.connection_enabled:
+            await self.async_display_native_animation()
+
     async def async_power(self, on: bool) -> None:
         """Turn laser output on or off."""
         if on:
@@ -639,6 +698,7 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Use the same raw old-protocol OFF packet that is live-verified to
             # stop native animations and update the real device_on byte.
             await self.client.request("raw", {"hex": "B0B1B2B300B4B5B6B7"})
+            self._native_animation_active = False
         self.is_on = on
         self.async_set_updated_data(
             {
@@ -664,6 +724,7 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("power", {"on": True})
         await self.client.request("raw", {"hex": command})
         self.is_on = True
+        self._native_animation_active = False
         await self.async_request_refresh()
 
     @staticmethod
@@ -703,6 +764,7 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("power", {"on": True})
         await self.client.request("raw", {"hex": command})
         self.is_on = True
+        self._native_animation_active = False
         await self.async_request_refresh()
 
     @staticmethod
@@ -764,4 +826,5 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("raw", {"hex": a0})
         await self.client.request("raw", {"hex": c0})
         self.is_on = True
+        self._native_animation_active = False
         await self.async_request_refresh()
