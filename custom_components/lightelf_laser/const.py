@@ -105,25 +105,24 @@ SOUND_SENSITIVITY_MAX = 100
 
 # Live effect transforms. The 16-byte config block at the head of every F0
 # hand-draw command (cnfValus) carries firmware-driven geometric transforms; we
-# apply them to our own SVG/shape/text draws. Model: a motion "base" (per cnf
-# index) is the reference at speed=100; the Motion speed slider scales each base
-# value within its band toward MOTION_FIELD_FLOOR (so rotations stay above their
-# spin threshold instead of going static). The displayed FX knobs are the
-# scaled result, so they move with the speed slider. Presets set the base; a
-# preset maps cnf_index -> value (the speed-100 reference). idx: 7=zoom
-# 8=rotate_z 9=rotate_x 10=rotate_y 11=move_x 12=move_y. On this device_type=0
-# unit, rotate_z=vertical-axis spin, rotate_y=horizontal-axis spin,
-# move_x(high)=barrel/cylinder warp, zoom(136-215)=loop scaling.
+# apply them to our own SVG/shape/text draws. Model: each preset defines, per
+# cnf index, the (slow, fast) band that the Motion speed slider sweeps -- speed
+# 1 = the slow end, 100 = the fast end -- so one slider takes a preset from its
+# slowest to its fastest. The displayed FX knobs are the resulting values, so
+# they move with the speed slider. idx: 7=zoom 8=rotate_z 9=rotate_x 10=rotate_y
+# 11=move_x 12=move_y. On this device_type=0 unit, rotate_z=vertical-axis spin,
+# rotate_y=horizontal-axis spin (rotate bands: 128-191 forward, 192-255 reverse),
+# move_x=barrel/cylinder warp, zoom(136-215)=loop scaling.
 MOTION_PRESETS = {
     "off": {},
-    "spin": {8: 150},                      # vertical-axis spin (chill)
-    "spin_reverse": {8: 215},              # reverse vertical-axis spin
-    "flip": {10: 150},                     # horizontal-axis spin
-    "tumble": {8: 150, 10: 150},           # both axes -> 3D tumble
-    "wobble": {9: 150, 10: 150},           # rotate_x + rotate_y
-    "cylinder": {11: 220},                 # move_x warp / cylinder wrap
-    "throb": {7: 155},                     # zoom loop-scaling
-    "chaos": {8: 160, 10: 150, 11: 180},   # everything at once
+    "spin": {8: (128, 191)},                            # rotate_z forward spin
+    "spin_reverse": {8: (192, 255)},                    # rotate_z reverse spin
+    "flip": {10: (128, 255)},                           # rotate_y horizontal spin
+    "tumble": {8: (128, 191), 10: (128, 255)},          # both axes -> 3D tumble
+    "wobble": {9: (128, 255), 10: (128, 255)},          # rotate_x + rotate_y
+    "cylinder": {11: (80, 255)},                        # move_x barrel/cylinder warp
+    "throb": {7: (136, 215)},                           # zoom loop-scaling
+    "chaos": {8: (128, 191), 10: (128, 255), 11: (80, 255)},  # everything at once
 }
 MOTION_MODES = tuple(MOTION_PRESETS)
 MOTION_MODE_LABELS = {
@@ -139,14 +138,11 @@ MOTION_MODE_LABELS = {
 }
 MOTION_CUSTOM_LABEL = "Custom"
 
-# Motion speed scales each active knob from its floor toward the base value:
-# scaled = floor + (base - floor) * speed/100. Floors keep continuous-motion
-# fields in their moving band at low speed (rotation must stay >=128 to spin,
-# zoom >=136 to loop); fields without a floor scale from 0.
+# Motion speed (1-100) sweeps each active field across its preset band:
+# value = round(slow + (fast - slow) * (speed-1)/99). 1 = slowest, 100 = fastest.
 MOTION_SPEED_MIN = 1
 MOTION_SPEED_MAX = 100
-DEFAULT_MOTION_SPEED = 100
-MOTION_FIELD_FLOOR = {7: 136, 8: 128, 9: 128, 10: 128}
+DEFAULT_MOTION_SPEED = 50
 
 # Raw transform "knobs" — the displayed/scaled draw-transform values. Full
 # 0-255 range so EVERY behavior band is reachable (static position/warp AND
