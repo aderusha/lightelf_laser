@@ -7,7 +7,7 @@
   projector's onboard microphone instead of a fixed speed. No host audio
   streaming is used. Both settings persist across restarts.
 - Add **live effect transforms** for drawn content (SVG/shape/text): a `Motion`
-  picker (Spin vertical/horizontal, Tumble, Scroll X/Y, Cylinder, Chaos) backed
+  picker (Spin vertical/horizontal, Zoom, Scroll X/Y, Warp, Chaos) backed
   by raw transform knobs and a `Motion speed` slider, plus a `Size` control
   (10-100%) for static uniform scaling. Transforms run firmware-side, compose
   with each other and with sound mode, re-apply to the current drawing live, and

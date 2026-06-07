@@ -114,29 +114,31 @@ SOUND_SENSITIVITY_MAX = 100
 # (the keys below are legacy/internal; the labels reflect observed behavior):
 #   7  = horizontal-axis spin   (0-127 static angle, 128-255 increasing speed)
 #   8  = vertical-axis spin     (0-127 static angle, 128-255 increasing speed)
+#   7 + 8 together = a uniform ZOOM (scale in/out) -- the projected silhouette
+#        scales; rate set by the shared speed. (Discovered 2026-06-07.)
 #   9  = horizontal scroll/wrap (0-127 static offset, 128-255 scroll speed)
 #   10 = vertical scroll/wrap   (0-127 static offset, 128-255 scroll speed)
 #   11 = barrel/cylinder warp
 #   12 = no visible effect on this unit
 MOTION_PRESETS = {
     "off": {},
-    "spin": {8: (130, 255)},                           # vertical-axis spin
-    "spin_h": {7: (130, 255)},                         # horizontal-axis spin
-    "tumble": {7: (130, 255), 8: (130, 255)},          # both spin axes
-    "scroll_x": {9: (130, 255)},                       # horizontal scroll
-    "scroll_y": {10: (130, 255)},                      # vertical scroll
-    "cylinder": {11: (80, 255)},                       # barrel/cylinder warp
-    "chaos": {7: (130, 255), 8: (130, 255), 9: (150, 255)},  # spins + scroll
+    "spin": {8: (128, 255)},                           # vertical-axis spin
+    "spin_h": {7: (128, 255)},                         # horizontal-axis spin
+    "zoom": {7: (128, 255), 8: (128, 255)},            # 7+8 -> uniform zoom in/out
+    "scroll_x": {9: (128, 255)},                       # horizontal scroll
+    "scroll_y": {10: (128, 255)},                      # vertical scroll
+    "warp": {11: (1, 255)},                            # barrel/cylinder warp
+    "chaos": {7: (128, 255), 8: (128, 255), 9: (150, 255)},  # zoom + scroll
 }
 MOTION_MODES = tuple(MOTION_PRESETS)
 MOTION_MODE_LABELS = {
     "off": "Off",
     "spin": "Spin (vertical)",
     "spin_h": "Spin (horizontal)",
-    "tumble": "Tumble",
+    "zoom": "Zoom",
     "scroll_x": "Scroll X",
     "scroll_y": "Scroll Y",
-    "cylinder": "Cylinder",
+    "warp": "Warp",
     "chaos": "Chaos",
 }
 MOTION_CUSTOM_LABEL = "Custom"
@@ -153,12 +155,11 @@ DEFAULT_MOTION_SPEED = 50
 # reflect observed behavior; keys are legacy/internal (kept stable so entity ids
 # don't churn). (key, label, cnf_index).
 TRANSFORM_KNOBS = (
-    ("fx_zoom", "Horizontal spin (7)", 7),
-    ("fx_rotate_z", "Vertical spin (8)", 8),
-    ("fx_rotate_x", "Scroll X (9)", 9),
-    ("fx_rotate_y", "Scroll Y (10)", 10),
-    ("fx_move_x", "Cylinder / warp (11)", 11),
-    ("fx_move_y", "Move Y (12, no effect)", 12),
+    ("fx_zoom", "Horizontal spin", 7),
+    ("fx_rotate_z", "Vertical spin", 8),
+    ("fx_rotate_x", "Scroll X", 9),
+    ("fx_rotate_y", "Scroll Y", 10),
+    ("fx_move_x", "Warp", 11),
 )
 TRANSFORM_KNOB_INDICES = tuple(index for *_, index in TRANSFORM_KNOBS)
 FX_VALUE_MIN = 0

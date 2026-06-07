@@ -33,12 +33,12 @@ The integration creates a compact Home Assistant control surface:
 - `number.lightelf_laser_sound_sensitivity`: microphone sensitivity (1-100).
 - `number.lightelf_laser_size`: static size for drawn content (10-100%).
 - `select.lightelf_laser_motion`: live motion for drawn content (Off /
-  Spin vertical / Spin horizontal / Tumble / Scroll X / Scroll Y / Cylinder /
-  Chaos / Custom).
+  Spin vertical / Spin horizontal / Zoom / Scroll X / Scroll Y / Warp / Chaos /
+  Custom).
 - `number.lightelf_laser_motion_speed`: master motion speed (1-100%); scales the
   active transform (the FX knobs move to reflect it).
-- `number.lightelf_laser_fx_*`: raw transform knobs (zoom, rotate-Z/X/Y,
-  move/warp-X/Y, 0-255) for fine control; a preset populates these.
+- `number.lightelf_laser_fx_*`: raw transform knobs (Horizontal/Vertical spin,
+  Scroll X/Y, Warp; 0-255) for fine control; a preset populates these.
 - `number.lightelf_laser_dmx_address`: DMX-512 start address / base channel
   (1-512); only relevant when the laser is on a DMX rig.
 
@@ -112,8 +112,8 @@ These shape your own drawn content — SVGs, vector text, and built-in shapes
 - **Size** (`number.lightelf_laser_size`, 10-100%) statically scales the drawing
   uniformly, so you can make a logo or shape smaller to fit your wall.
 - **Motion** (`select.lightelf_laser_motion`) applies a firmware-driven live
-  transform to the drawing: **Spin** (vertical or horizontal axis), **Tumble**
-  (both axes), **Scroll X/Y**, and **Cylinder** (barrel wrap). Motion runs
+  transform to the drawing: **Spin** (vertical or horizontal axis), **Zoom**
+  (scale in/out), **Scroll X/Y**, **Warp** (barrel), and **Chaos**. Motion runs
   projector-side and composes with Size.
 - **Motion speed** (`number.lightelf_laser_motion_speed`, 1-100%) scales the
   active motion. The FX knob sliders move to reflect the current speed.
