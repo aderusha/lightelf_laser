@@ -4,17 +4,15 @@
 [![MIT License](https://img.shields.io/badge/license-MIT-green)](https://github.com/aderusha/lightelf_laser/blob/main/LICENSE)
 ![Local Bluetooth](https://img.shields.io/badge/Control-Local%20Bluetooth-blue.svg)
 
-Home Assistant custom integration for LightElf-compatible BLE RGB laser
-projectors, such as [this inexpensive example on Amazon](https://amzn.to/4uU93oj) <sup>(*affiliate link*)</sup>.
+Home Assistant custom integration for LightElf-compatible BLE RGB laser projectors, such as [this inexpensive example on Amazon](https://amzn.to/4uU93oj) <sup>(*affiliate link*)</sup>.
 
-This integration runs locally through Home Assistant's native Bluetooth stack, no cloud service or mobile app required for setup nor operation.
+This integration runs locally through Home Assistant's native Bluetooth stack, no cloud service or mobile app required for setup nor operation.  Plug in your laser, HA detects it, you import it, and you're ready to party!
 
 ![LightElf Laser dashboard](images/dashboard.png)
 
-Control projector power, SVGs, text, built-in shapes, and firmware-native
-animations from Home Assistant, with previews before you light the wall.
+Control projector power, SVGs, text, built-in shapes, and firmware-native animations from Home Assistant, all with native HA control surfaces and previews before you light the wall.
 
-![Projected SVG example](images/logo.jpg)
+![LightElf Laser dashboard](images/HAlogo.gif)
 
 ## Features
 
@@ -44,20 +42,13 @@ animations from Home Assistant, with previews before you light the wall.
 ### Manual install
 
 Copy `custom_components/lightelf_laser` into your Home Assistant
-`custom_components` directory, restart Home Assistant, then add **LightElf Laser**
-from **Settings > Devices & services**.
+`custom_components` directory, restart Home Assistant, then add **LightElf Laser** from **Settings > Devices & services**.
 
 ## Setup Notes
 
-The projector supports one BLE connection at a time. If setup cannot find the
-device, disconnect any other BLE controller and try again. Once configured, the
-**BLE connection** switch controls whether Home Assistant holds the connection or
-releases it.
+The projector supports one BLE connection at a time. If setup cannot find the device, disconnect any other BLE controller (such as the mobile app) and try again. Once configured, the **BLE connection** switch controls whether Home Assistant holds the connection or releases it.  Turn that switch off to re-enable mobile app connections.
 
-The integration seeds a few starter SVGs into Home Assistant local media on
-first run. Upload your own from
-**Settings > Devices & services > LightElf Laser > Configure**; the integration
-saves the file, refreshes the SVG picker, and selects it automatically.
+The integration seeds a few starter SVGs into Home Assistant local media on first run. Upload your own from **Settings > Devices & services > LightElf Laser > Configure**; the integration saves the file, refreshes the SVG picker, and selects it automatically.
 
 ## Documentation
 
@@ -68,13 +59,13 @@ saves the file, refreshes the SVG picker, and selects it automatically.
 
 ## Safety
 
-This controls laser hardware. Aim the projector at a safe projection surface,
-avoid eye exposure, and follow the safety instructions for your device.
+This controls laser hardware. Aim the projector at a safe projection surface, avoid eye exposure, and follow the safety instructions for your device.
 
 ## License
 
 The integration code is released under the [MIT License](LICENSE).
 
-Bundled Hershey font data is permissively redistributable with acknowledgements;
-see [Third-Party Notices](THIRD_PARTY_NOTICES.md) and the bundled
+Bundled Hershey font data is permissively redistributable with acknowledgements; see [Third-Party Notices](THIRD_PARTY_NOTICES.md) and the bundled
 `custom_components/lightelf_laser/fonts/NOTICE.md`.
+
+![Projected SVG example](images/logo.jpg)
