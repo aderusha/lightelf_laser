@@ -7,22 +7,22 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
-from .coordinator import EytseLaserDataUpdateCoordinator
+from .coordinator import LightElfLaserDataUpdateCoordinator
 
 
-class EytseLaserEntity(CoordinatorEntity[EytseLaserDataUpdateCoordinator], Entity):
+class LightElfLaserEntity(CoordinatorEntity[LightElfLaserDataUpdateCoordinator], Entity):
     """Base class for LightElf Laser entities."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: EytseLaserDataUpdateCoordinator, key: str) -> None:
+    def __init__(self, coordinator: LightElfLaserDataUpdateCoordinator, key: str) -> None:
         """Initialize the entity."""
         super().__init__(coordinator)
         self._attr_unique_id = f"{coordinator.device_id}-{key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, coordinator.device_id)},
             name=coordinator.config_entry.data.get("name", "LightElf Laser"),
-            manufacturer="Eytse / LightElf",
+            manufacturer="LightElf",
             model="EY003-L DJ Laser Light",
         )
 

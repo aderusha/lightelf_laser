@@ -9,28 +9,28 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EytseLaserConfigEntry
-from .entity import EytseLaserEntity
+from .coordinator import LightElfLaserConfigEntry
+from .entity import LightElfLaserEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: EytseLaserConfigEntry,
+    config_entry: LightElfLaserConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up switch entities."""
     coordinator = config_entry.runtime_data
     async_add_entities(
         [
-            EytseConnectionSwitch(coordinator),
-            EytseSoundReactiveSwitch(coordinator),
-            EytseInvertAxisSwitch(coordinator, "invert_x", "Invert X", "mdi:axis-x-arrow"),
-            EytseInvertAxisSwitch(coordinator, "invert_y", "Invert Y", "mdi:axis-y-arrow"),
+            LightElfConnectionSwitch(coordinator),
+            LightElfSoundReactiveSwitch(coordinator),
+            LightElfInvertAxisSwitch(coordinator, "invert_x", "Invert X", "mdi:axis-x-arrow"),
+            LightElfInvertAxisSwitch(coordinator, "invert_y", "Invert Y", "mdi:axis-y-arrow"),
         ]
     )
 
 
-class EytseConnectionSwitch(EytseLaserEntity, SwitchEntity):
+class LightElfConnectionSwitch(LightElfLaserEntity, SwitchEntity):
     """Hold or release the single BLE connection.
 
     On = Home Assistant connects and polls the laser. Off = release the radio so
@@ -69,7 +69,7 @@ class EytseConnectionSwitch(EytseLaserEntity, SwitchEntity):
         await self.coordinator.async_set_connection(False)
 
 
-class EytseSoundReactiveSwitch(EytseLaserEntity, SwitchEntity):
+class LightElfSoundReactiveSwitch(LightElfLaserEntity, SwitchEntity):
     """Make firmware effects react to the projector's onboard microphone.
 
     On = the playing firmware effect (animation/line/christmas/outdoor) reacts to
@@ -108,7 +108,7 @@ class EytseSoundReactiveSwitch(EytseLaserEntity, SwitchEntity):
         await self.coordinator.async_set_sound_reactive(False)
 
 
-class EytseInvertAxisSwitch(EytseLaserEntity, SwitchEntity):
+class LightElfInvertAxisSwitch(LightElfLaserEntity, SwitchEntity):
     """Quick toggles for the projector-global mount inversion settings."""
 
     _attr_device_class = SwitchDeviceClass.SWITCH

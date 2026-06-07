@@ -6,20 +6,20 @@ from homeassistant.components.text import TextEntity, TextMode
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EytseLaserConfigEntry
-from .entity import EytseLaserEntity
+from .coordinator import LightElfLaserConfigEntry
+from .entity import LightElfLaserEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: EytseLaserConfigEntry,
+    config_entry: LightElfLaserConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the text-message entity."""
-    async_add_entities([EytseTextMessage(config_entry.runtime_data)])
+    async_add_entities([LightElfTextMessage(config_entry.runtime_data)])
 
 
-class EytseTextMessage(EytseLaserEntity, TextEntity):
+class LightElfTextMessage(LightElfLaserEntity, TextEntity):
     """The message that the Show Text button will draw."""
 
     _attr_name = "Text"

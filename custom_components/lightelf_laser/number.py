@@ -30,12 +30,12 @@ from .const import (
     TEXT_Y_MIN,
     TRANSFORM_KNOBS,
 )
-from .coordinator import EytseLaserConfigEntry
-from .entity import EytseLaserEntity
+from .coordinator import LightElfLaserConfigEntry
+from .entity import LightElfLaserEntity
 
 
 @dataclass(frozen=True, kw_only=True)
-class EytseNumberDescription(NumberEntityDescription):
+class LightElfNumberDescription(NumberEntityDescription):
     """Number metadata."""
 
     attr: str
@@ -48,7 +48,7 @@ class EytseNumberDescription(NumberEntityDescription):
 
 
 NUMBERS = (
-    EytseNumberDescription(
+    LightElfNumberDescription(
         key="text_size",
         name="Text size",
         icon="mdi:format-size",
@@ -57,7 +57,7 @@ NUMBERS = (
         maximum=TEXT_SIZE_MAX,
         step=10,
     ),
-    EytseNumberDescription(
+    LightElfNumberDescription(
         key="text_y",
         name="Text vertical position",
         icon="mdi:arrow-up-down",
@@ -66,7 +66,7 @@ NUMBERS = (
         maximum=TEXT_Y_MAX,
         step=10,
     ),
-    EytseNumberDescription(
+    LightElfNumberDescription(
         key="shape_index",
         name="Shape index",
         icon="mdi:counter",
@@ -76,7 +76,7 @@ NUMBERS = (
         step=1,
         dynamic_max_attr="builtin_count",
     ),
-    EytseNumberDescription(
+    LightElfNumberDescription(
         key="scroll_speed",
         name="Scroll speed",
         icon="mdi:speedometer",
@@ -85,7 +85,7 @@ NUMBERS = (
         maximum=100,
         step=1,
     ),
-    EytseNumberDescription(
+    LightElfNumberDescription(
         key="animation_index",
         name="Animation index",
         icon="mdi:counter",
@@ -95,7 +95,7 @@ NUMBERS = (
         step=1,
         dynamic_max_attr="native_animation_count",
     ),
-    EytseNumberDescription(
+    LightElfNumberDescription(
         key="animation_speed",
         name="Animation speed",
         icon="mdi:speedometer",
@@ -109,31 +109,31 @@ NUMBERS = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: EytseLaserConfigEntry,
+    config_entry: LightElfLaserConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up number entities."""
     coordinator = config_entry.runtime_data
     entities: list[NumberEntity] = [
-        EytseNumber(coordinator, description) for description in NUMBERS
+        LightElfNumber(coordinator, description) for description in NUMBERS
     ]
-    entities.append(EytseSoundSensitivityNumber(coordinator))
-    entities.append(EytseDrawScaleNumber(coordinator))
-    entities.append(EytseMotionSpeedNumber(coordinator))
-    entities.append(EytseDmxAddressNumber(coordinator))
+    entities.append(LightElfSoundSensitivityNumber(coordinator))
+    entities.append(LightElfDrawScaleNumber(coordinator))
+    entities.append(LightElfMotionSpeedNumber(coordinator))
+    entities.append(LightElfDmxAddressNumber(coordinator))
     entities.extend(
-        EytseFxKnobNumber(coordinator, key, label, index)
+        LightElfFxKnobNumber(coordinator, key, label, index)
         for key, label, index in TRANSFORM_KNOBS
     )
     async_add_entities(entities)
 
 
-class EytseNumber(EytseLaserEntity, NumberEntity):
+class LightElfNumber(LightElfLaserEntity, NumberEntity):
     """A configurable laser parameter held locally until the next draw."""
 
     _attr_mode = NumberMode.BOX
 
-    def __init__(self, coordinator, description: EytseNumberDescription) -> None:
+    def __init__(self, coordinator, description: LightElfNumberDescription) -> None:
         """Initialize the entity."""
         super().__init__(coordinator, description.key)
         self.entity_description = description
@@ -182,7 +182,7 @@ class EytseNumber(EytseLaserEntity, NumberEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseSoundSensitivityNumber(EytseLaserEntity, NumberEntity):
+class LightElfSoundSensitivityNumber(LightElfLaserEntity, NumberEntity):
     """Onboard-mic sensitivity for sound-reactive ("Music") playback.
 
     Persisted in entry.options via the coordinator; re-applied live when sound
@@ -215,7 +215,7 @@ class EytseSoundSensitivityNumber(EytseLaserEntity, NumberEntity):
         await self.coordinator.async_set_sound_sensitivity(int(value))
 
 
-class EytseDrawScaleNumber(EytseLaserEntity, NumberEntity):
+class LightElfDrawScaleNumber(LightElfLaserEntity, NumberEntity):
     """Static size for drawn content (SVG/shape/text), as a percent.
 
     Host-side uniform scale of the draw points (100 = full auto-fit size, lower =
@@ -249,7 +249,7 @@ class EytseDrawScaleNumber(EytseLaserEntity, NumberEntity):
         await self.coordinator.async_set_draw_scale(int(value))
 
 
-class EytseMotionSpeedNumber(EytseLaserEntity, NumberEntity):
+class LightElfMotionSpeedNumber(LightElfLaserEntity, NumberEntity):
     """Master speed for the Motion transform (1-100%).
 
     Scales the active transform knobs within their bands; the FX knob sliders
@@ -283,7 +283,7 @@ class EytseMotionSpeedNumber(EytseLaserEntity, NumberEntity):
         await self.coordinator.async_set_motion_speed(int(value))
 
 
-class EytseDmxAddressNumber(EytseLaserEntity, NumberEntity):
+class LightElfDmxAddressNumber(LightElfLaserEntity, NumberEntity):
     """DMX-512 start address (base channel), 1-512.
 
     A device config value written to the projector over BLE and read back from
@@ -317,7 +317,7 @@ class EytseDmxAddressNumber(EytseLaserEntity, NumberEntity):
         await self.coordinator.async_set_dmx_address(int(value))
 
 
-class EytseFxKnobNumber(EytseLaserEntity, NumberEntity):
+class LightElfFxKnobNumber(LightElfLaserEntity, NumberEntity):
     """A raw transform knob (one F0 config-block / cnfValus byte, 0-255).
 
     For live exploration: any non-zero knob overrides the Motion preset and is

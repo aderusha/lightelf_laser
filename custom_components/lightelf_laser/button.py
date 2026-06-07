@@ -10,46 +10,46 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EytseLaserConfigEntry, EytseLaserDataUpdateCoordinator
-from .entity import EytseLaserEntity
+from .coordinator import LightElfLaserConfigEntry, LightElfLaserDataUpdateCoordinator
+from .entity import LightElfLaserEntity
 
 
 @dataclass(frozen=True, kw_only=True)
-class EytseButtonDescription(ButtonEntityDescription):
+class LightElfButtonDescription(ButtonEntityDescription):
     """Button metadata."""
 
-    action: Callable[[EytseLaserDataUpdateCoordinator], Awaitable[None]]
+    action: Callable[[LightElfLaserDataUpdateCoordinator], Awaitable[None]]
     # When True the button needs a live BLE connection; when False it works
     # regardless (e.g. a filesystem rescan).
     needs_connection: bool = True
 
 
 BUTTONS = (
-    EytseButtonDescription(
+    LightElfButtonDescription(
         key="display_svg",
         name="Show SVG",
         icon="mdi:projector",
         action=lambda coordinator: coordinator.async_display_svg(),
     ),
-    EytseButtonDescription(
+    LightElfButtonDescription(
         key="display_text",
         name="Show Text",
         icon="mdi:format-text",
         action=lambda coordinator: coordinator.async_display_text(),
     ),
-    EytseButtonDescription(
+    LightElfButtonDescription(
         key="display_shape",
         name="Show Shape",
         icon="mdi:shape-plus",
         action=lambda coordinator: coordinator.async_display_shape(),
     ),
-    EytseButtonDescription(
+    LightElfButtonDescription(
         key="play_animation",
         name="Show Animation",
         icon="mdi:play-box",
         action=lambda coordinator: coordinator.async_display_native_animation(),
     ),
-    EytseButtonDescription(
+    LightElfButtonDescription(
         key="rescan_svg",
         name="Rescan SVG folder",
         icon="mdi:folder-refresh",
@@ -62,18 +62,18 @@ BUTTONS = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: EytseLaserConfigEntry,
+    config_entry: LightElfLaserConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up button entities."""
     coordinator = config_entry.runtime_data
-    async_add_entities(EytseButton(coordinator, description) for description in BUTTONS)
+    async_add_entities(LightElfButton(coordinator, description) for description in BUTTONS)
 
 
-class EytseButton(EytseLaserEntity, ButtonEntity):
+class LightElfButton(LightElfLaserEntity, ButtonEntity):
     """A laser action button."""
 
-    def __init__(self, coordinator, description: EytseButtonDescription) -> None:
+    def __init__(self, coordinator, description: LightElfButtonDescription) -> None:
         """Initialize the button."""
         super().__init__(coordinator, description.key)
         self.entity_description = description

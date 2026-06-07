@@ -7,28 +7,28 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
-from .coordinator import EytseLaserConfigEntry
-from .entity import EytseLaserEntity
+from .coordinator import LightElfLaserConfigEntry
+from .entity import LightElfLaserEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: EytseLaserConfigEntry,
+    config_entry: LightElfLaserConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up preview image entities."""
     coordinator = config_entry.runtime_data
     async_add_entities(
         [
-            EytseSvgPreview(coordinator, hass),
-            EytseTextPreview(coordinator, hass),
-            EytseShapePreview(coordinator, hass),
-            EytseNativeAnimationPreview(coordinator, hass),
+            LightElfSvgPreview(coordinator, hass),
+            LightElfTextPreview(coordinator, hass),
+            LightElfShapePreview(coordinator, hass),
+            LightElfNativeAnimationPreview(coordinator, hass),
         ]
     )
 
 
-class _PngPreviewBase(EytseLaserEntity, ImageEntity):
+class _PngPreviewBase(LightElfLaserEntity, ImageEntity):
     """Base class for generated PNG previews."""
 
     _attr_content_type = "image/png"
@@ -51,7 +51,7 @@ class _PngPreviewBase(EytseLaserEntity, ImageEntity):
         super()._handle_coordinator_update()
 
 
-class EytseSvgPreview(_PngPreviewBase):
+class LightElfSvgPreview(_PngPreviewBase):
     """Local preview of the currently-selected SVG."""
 
     _attr_name = "SVG preview"
@@ -65,7 +65,7 @@ class EytseSvgPreview(_PngPreviewBase):
         return await self.coordinator.async_read_svg_preview()
 
 
-class EytseTextPreview(_PngPreviewBase):
+class LightElfTextPreview(_PngPreviewBase):
     """Local preview of the current text settings."""
 
     _attr_name = "Text preview"
@@ -79,7 +79,7 @@ class EytseTextPreview(_PngPreviewBase):
         return await self.coordinator.async_read_text_preview()
 
 
-class EytseShapePreview(_PngPreviewBase):
+class LightElfShapePreview(_PngPreviewBase):
     """Live preview of the currently-selected built-in shape."""
 
     _attr_name = "Shape preview"
@@ -93,7 +93,7 @@ class EytseShapePreview(_PngPreviewBase):
         return await self.coordinator.async_read_shape_thumb()
 
 
-class EytseNativeAnimationPreview(EytseLaserEntity, ImageEntity):
+class LightElfNativeAnimationPreview(LightElfLaserEntity, ImageEntity):
     """Captured preview of the currently-selected firmware-native animation."""
 
     _attr_name = "Animation preview"

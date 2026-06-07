@@ -25,7 +25,7 @@ body:
     id: device
     attributes:
       label: Projector model or advertised BLE name
-      placeholder: "Eytse EY003-L / TD5322A..."
+      placeholder: "e.g. EY003-L / TD5322A_V3.1.2BLE"
     validations:
       required: false
   - type: textarea

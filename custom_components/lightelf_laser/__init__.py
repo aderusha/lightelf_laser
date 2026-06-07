@@ -23,7 +23,7 @@ from .const import (
     TEXT_Y_MAX,
     TEXT_Y_MIN,
 )
-from .coordinator import EytseLaserConfigEntry, EytseLaserDataUpdateCoordinator
+from .coordinator import LightElfLaserConfigEntry, LightElfLaserDataUpdateCoordinator
 from .errors import LightElfLaserError
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -38,7 +38,7 @@ SERVICE_QUERY_DEVICE = "query_device"
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up integration-level services."""
 
-    def _entry_from_call(call: ServiceCall) -> EytseLaserConfigEntry:
+    def _entry_from_call(call: ServiceCall) -> LightElfLaserConfigEntry:
         entries = hass.config_entries.async_entries(DOMAIN)
         entry_id = call.data.get("entry_id")
         if entry_id:
@@ -196,9 +196,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: EytseLaserConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: LightElfLaserConfigEntry) -> bool:
     """Set up LightElf Laser from a config entry."""
-    coordinator = EytseLaserDataUpdateCoordinator(hass, entry)
+    coordinator = LightElfLaserDataUpdateCoordinator(hass, entry)
     await coordinator.async_load_fonts()
     await coordinator.async_load_builtin()
     await coordinator.async_load_native_animations()

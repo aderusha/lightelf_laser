@@ -8,20 +8,20 @@ from homeassistant.components.light import ColorMode, LightEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EytseLaserConfigEntry
-from .entity import EytseLaserEntity
+from .coordinator import LightElfLaserConfigEntry
+from .entity import LightElfLaserEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: EytseLaserConfigEntry,
+    config_entry: LightElfLaserConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the laser light entity."""
-    async_add_entities([EytseLaserLight(config_entry.runtime_data)])
+    async_add_entities([LightElfLaserLight(config_entry.runtime_data)])
 
 
-class EytseLaserLight(EytseLaserEntity, LightEntity):
+class LightElfLaserLight(LightElfLaserEntity, LightEntity):
     """Projector output power, reflecting the device's real on/off state."""
 
     _attr_name = None

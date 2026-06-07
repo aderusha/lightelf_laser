@@ -143,15 +143,15 @@ def _fit_point_budget(points: list[list[int]], budget: int) -> list[list[int]]:
         chosen = set(mandatory) | {optional[int(k * step)] for k in range(keep)}
     return [points[index] for index in sorted(chosen)]
 
-type EytseLaserConfigEntry = ConfigEntry[EytseLaserDataUpdateCoordinator]
+type LightElfLaserConfigEntry = ConfigEntry[LightElfLaserDataUpdateCoordinator]
 
 
-class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Hold connection state, real power state, and the SVG file list."""
 
-    config_entry: EytseLaserConfigEntry
+    config_entry: LightElfLaserConfigEntry
 
-    def __init__(self, hass: HomeAssistant, entry: EytseLaserConfigEntry) -> None:
+    def __init__(self, hass: HomeAssistant, entry: LightElfLaserConfigEntry) -> None:
         """Initialize the coordinator."""
         self.transport = entry.data.get("transport", TRANSPORT_BLUETOOTH)
         timeout = float(entry.data.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))

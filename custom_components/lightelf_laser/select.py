@@ -18,15 +18,15 @@ from .const import (
     TEXT_COLOR_OPTIONS,
     TEXT_MODES,
 )
-from .coordinator import EytseLaserConfigEntry
-from .entity import EytseLaserEntity
+from .coordinator import LightElfLaserConfigEntry
+from .entity import LightElfLaserEntity
 
 _NONE = "(no SVG files found)"
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: EytseLaserConfigEntry,
+    config_entry: LightElfLaserConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up select entities."""
@@ -34,21 +34,21 @@ async def async_setup_entry(
     await coordinator.async_rescan_svgs()
     async_add_entities(
         [
-            EytseSvgSelect(coordinator),
-            EytseSvgColorSelect(coordinator),
-            EytseTextFontSelect(coordinator),
-            EytseTextColorSelect(coordinator),
-            EytseShapeFamilySelect(coordinator),
-            EytseShapeColorSelect(coordinator),
-            EytseNativeAnimationFamilySelect(coordinator),
-            EytseTextModeSelect(coordinator),
-            EytseMotionSelect(coordinator),
-            EytseMountOrientationSelect(coordinator),
+            LightElfSvgSelect(coordinator),
+            LightElfSvgColorSelect(coordinator),
+            LightElfTextFontSelect(coordinator),
+            LightElfTextColorSelect(coordinator),
+            LightElfShapeFamilySelect(coordinator),
+            LightElfShapeColorSelect(coordinator),
+            LightElfNativeAnimationFamilySelect(coordinator),
+            LightElfTextModeSelect(coordinator),
+            LightElfMotionSelect(coordinator),
+            LightElfMountOrientationSelect(coordinator),
         ]
     )
 
 
-class EytseSvgSelect(EytseLaserEntity, SelectEntity):
+class LightElfSvgSelect(LightElfLaserEntity, SelectEntity):
     """Pick which SVG file the Show SVG button will draw."""
 
     _attr_name = "SVG image"
@@ -83,7 +83,7 @@ class EytseSvgSelect(EytseLaserEntity, SelectEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseSvgColorSelect(EytseLaserEntity, SelectEntity):
+class LightElfSvgColorSelect(LightElfLaserEntity, SelectEntity):
     """SVG color: 'original' preserves SVG stroke colors, or force one color."""
 
     _attr_name = "SVG color"
@@ -110,7 +110,7 @@ class EytseSvgColorSelect(EytseLaserEntity, SelectEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseTextFontSelect(EytseLaserEntity, SelectEntity):
+class LightElfTextFontSelect(LightElfLaserEntity, SelectEntity):
     """Pick the Hershey vector font used to draw text."""
 
     _attr_name = "Text font"
@@ -141,7 +141,7 @@ class EytseTextFontSelect(EytseLaserEntity, SelectEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseTextColorSelect(EytseLaserEntity, SelectEntity):
+class LightElfTextColorSelect(LightElfLaserEntity, SelectEntity):
     """Pick the beam color used to draw text (solid, or rainbow per stroke)."""
 
     _attr_name = "Text color"
@@ -168,7 +168,7 @@ class EytseTextColorSelect(EytseLaserEntity, SelectEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseShapeFamilySelect(EytseLaserEntity, SelectEntity):
+class LightElfShapeFamilySelect(LightElfLaserEntity, SelectEntity):
     """Pick the built-in shape family to browse."""
 
     _attr_name = "Shape family"
@@ -202,7 +202,7 @@ class EytseShapeFamilySelect(EytseLaserEntity, SelectEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseShapeColorSelect(EytseLaserEntity, SelectEntity):
+class LightElfShapeColorSelect(LightElfLaserEntity, SelectEntity):
     """Shape color: 'original' keeps the shape's own colors, or force one color."""
 
     _attr_name = "Shape color"
@@ -229,7 +229,7 @@ class EytseShapeColorSelect(EytseLaserEntity, SelectEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseNativeAnimationFamilySelect(EytseLaserEntity, SelectEntity):
+class LightElfNativeAnimationFamilySelect(LightElfLaserEntity, SelectEntity):
     """Pick the firmware-native animation/effect family to play."""
 
     _attr_name = "Animation family"
@@ -260,7 +260,7 @@ class EytseNativeAnimationFamilySelect(EytseLaserEntity, SelectEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseTextModeSelect(EytseLaserEntity, SelectEntity):
+class LightElfTextModeSelect(LightElfLaserEntity, SelectEntity):
     """How the Show Text button shows text: static, or scrolling by direction."""
 
     _attr_name = "Text mode"
@@ -287,7 +287,7 @@ class EytseTextModeSelect(EytseLaserEntity, SelectEntity):
         self.coordinator.async_update_listeners()
 
 
-class EytseMotionSelect(EytseLaserEntity, SelectEntity):
+class LightElfMotionSelect(LightElfLaserEntity, SelectEntity):
     """Live motion applied to SVG/shape/text draws.
 
     Each preset populates the raw transform knobs; the knobs stay the source of
@@ -325,7 +325,7 @@ class EytseMotionSelect(EytseLaserEntity, SelectEntity):
         await self.coordinator.async_set_motion(self._labels_to_mode[option])
 
 
-class EytseMountOrientationSelect(EytseLaserEntity, SelectEntity):
+class LightElfMountOrientationSelect(LightElfLaserEntity, SelectEntity):
     """Pick the projector-global mount orientation from the app presets."""
 
     _attr_name = "Mount orientation"
