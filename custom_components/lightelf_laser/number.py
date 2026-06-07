@@ -17,6 +17,8 @@ from .const import (
     DRAW_SCALE_MIN,
     FX_VALUE_MAX,
     FX_VALUE_MIN,
+    MOTION_SPEED_MAX,
+    MOTION_SPEED_MIN,
     SOUND_SENSITIVITY_MAX,
     SOUND_SENSITIVITY_MIN,
     TEXT_SIZE_MAX,
@@ -114,6 +116,7 @@ async def async_setup_entry(
     ]
     entities.append(EytseSoundSensitivityNumber(coordinator))
     entities.append(EytseDrawScaleNumber(coordinator))
+    entities.append(EytseMotionSpeedNumber(coordinator))
     entities.extend(
         EytseFxKnobNumber(coordinator, key, label, index)
         for key, label, index in TRANSFORM_KNOBS
@@ -240,6 +243,40 @@ class EytseDrawScaleNumber(EytseLaserEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Persist the draw scale and re-apply the current draw."""
         await self.coordinator.async_set_draw_scale(int(value))
+
+
+class EytseMotionSpeedNumber(EytseLaserEntity, NumberEntity):
+    """Master speed for the Motion transform (1-100%).
+
+    Scales the active transform knobs within their bands; the FX knob sliders
+    move to reflect it. Persisted; re-applies to the current draw on change.
+    """
+
+    _attr_name = "Motion speed"
+    _attr_icon = "mdi:speedometer"
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_min_value = MOTION_SPEED_MIN
+    _attr_native_max_value = MOTION_SPEED_MAX
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = "%"
+
+    def __init__(self, coordinator) -> None:
+        """Initialize the motion-speed slider."""
+        super().__init__(coordinator, "motion_speed")
+
+    @property
+    def available(self) -> bool:
+        """Editable even when the radio is released (applied on next draw)."""
+        return True
+
+    @property
+    def native_value(self) -> float:
+        """Return the current motion speed."""
+        return int(self.coordinator.motion_speed)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Persist the motion speed and re-apply the current draw."""
+        await self.coordinator.async_set_motion_speed(int(value))
 
 
 class EytseFxKnobNumber(EytseLaserEntity, NumberEntity):

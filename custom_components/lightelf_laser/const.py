@@ -105,13 +105,15 @@ SOUND_SENSITIVITY_MAX = 100
 
 # Live effect transforms. The 16-byte config block at the head of every F0
 # hand-draw command (cnfValus) carries firmware-driven geometric transforms; we
-# apply them to our own SVG/shape/text draws. The raw knobs (TRANSFORM_KNOBS,
-# below) are the single source of truth; motion presets just populate them, so
-# the picker shows "Custom" once a knob is hand-tweaked. Each preset maps
-# cnf_index -> value. idx: 7=zoom 8=rotate_z 9=rotate_x 10=rotate_y 11=move_x
-# 12=move_y. On this device_type=0 unit, rotate_z=vertical-axis spin, rotate_y=
-# horizontal-axis spin, move_x(high)=barrel/cylinder warp, zoom(136-215)=loop
-# scaling; values are tuned starting points and remain editable via the knobs.
+# apply them to our own SVG/shape/text draws. Model: a motion "base" (per cnf
+# index) is the reference at speed=100; the Motion speed slider scales each base
+# value within its band toward MOTION_FIELD_FLOOR (so rotations stay above their
+# spin threshold instead of going static). The displayed FX knobs are the
+# scaled result, so they move with the speed slider. Presets set the base; a
+# preset maps cnf_index -> value (the speed-100 reference). idx: 7=zoom
+# 8=rotate_z 9=rotate_x 10=rotate_y 11=move_x 12=move_y. On this device_type=0
+# unit, rotate_z=vertical-axis spin, rotate_y=horizontal-axis spin,
+# move_x(high)=barrel/cylinder warp, zoom(136-215)=loop scaling.
 MOTION_PRESETS = {
     "off": {},
     "spin": {8: 150},                      # vertical-axis spin (chill)
@@ -137,11 +139,21 @@ MOTION_MODE_LABELS = {
 }
 MOTION_CUSTOM_LABEL = "Custom"
 
-# Raw transform "knobs" — the source of truth for the draw transform. Full
+# Motion speed scales each active knob from its floor toward the base value:
+# scaled = floor + (base - floor) * speed/100. Floors keep continuous-motion
+# fields in their moving band at low speed (rotation must stay >=128 to spin,
+# zoom >=136 to loop); fields without a floor scale from 0.
+MOTION_SPEED_MIN = 1
+MOTION_SPEED_MAX = 100
+DEFAULT_MOTION_SPEED = 100
+MOTION_FIELD_FLOOR = {7: 136, 8: 128, 9: 128, 10: 128}
+
+# Raw transform "knobs" — the displayed/scaled draw-transform values. Full
 # 0-255 range so EVERY behavior band is reachable (static position/warp AND
-# continuous-motion speed). Motion presets populate these; hand-editing one
-# makes the Motion picker read "Custom". (key, label, cnf_index). idx: 7=zoom
-# 8=rotate_z 9=rotate_x 10=rotate_y 11=move_x 12=move_y.
+# continuous-motion speed). Motion presets populate the base and the speed
+# slider scales these; hand-editing one makes the Motion picker read "Custom".
+# (key, label, cnf_index). idx: 7=zoom 8=rotate_z 9=rotate_x 10=rotate_y
+# 11=move_x 12=move_y.
 TRANSFORM_KNOBS = (
     ("fx_zoom", "FX zoom (7)", 7),
     ("fx_rotate_z", "FX rotate-Z / vertical spin (8)", 8),

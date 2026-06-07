@@ -21,6 +21,7 @@ from .const import (
     COLOR_OPTIONS,
     CONF_TIMEOUT,
     DEFAULT_DRAW_SCALE,
+    DEFAULT_MOTION_SPEED,
     DEFAULT_NATIVE_ANIMATION_FAMILY,
     DEFAULT_NATIVE_ANIMATION_INDEX,
     DEFAULT_NATIVE_ANIMATION_SPEED,
@@ -43,7 +44,10 @@ from .const import (
     FX_VALUE_MAX,
     FX_VALUE_MIN,
     LOGGER,
+    MOTION_FIELD_FLOOR,
     MOTION_PRESETS,
+    MOTION_SPEED_MAX,
+    MOTION_SPEED_MIN,
     MOUNT_ORIENTATION_BY_XY,
     MOUNT_ORIENTATION_OPTIONS,
     NATIVE_ANIMATION_CATALOG_FILE,
@@ -211,14 +215,19 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._native_animation_active = False
 
         # Live effect transforms applied to our own draws (SVG/shape/text). The
-        # raw knobs (fx_values) are the single source of truth; the Motion preset
-        # picker just populates them. Persisted in entry.options under fx_values.
-        # The last-draw callback lets a knob/preset change re-issue the current
+        # motion "base" is the per-knob reference at speed=100; the Motion speed
+        # slider scales it (see fx_values). A preset sets the base; the displayed
+        # knobs are the scaled result. Persisted in entry.options (motion_base +
+        # motion_speed; legacy fx_values is read as the base for migration). The
+        # last-draw callback lets a knob/preset/speed change re-issue the current
         # draw live.
-        stored_fx = entry.options.get("fx_values", {}) or {}
-        self.fx_values = {
-            index: int(stored_fx.get(str(index), 0)) for index in TRANSFORM_KNOB_INDICES
+        stored_base = entry.options.get("motion_base")
+        if stored_base is None:
+            stored_base = entry.options.get("fx_values", {}) or {}
+        self.motion_base = {
+            index: int(stored_base.get(str(index), 0)) for index in TRANSFORM_KNOB_INDICES
         }
+        self.motion_speed = int(entry.options.get("motion_speed", DEFAULT_MOTION_SPEED))
         # Host-side static draw scale (percent); shrinks SVG/shape/text uniformly.
         self.draw_scale = int(entry.options.get("draw_scale", DEFAULT_DRAW_SCALE))
         self._last_draw: Callable[[], Awaitable[None]] | None = None
@@ -724,23 +733,48 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.is_on and self._native_animation_active and self.connection_enabled:
             await self.async_display_native_animation()
 
+    def _fx_scale(self, index: int, base: int) -> int:
+        """Scale a base knob value by the motion speed (floor-aware)."""
+        if base == 0:
+            return 0
+        floor = MOTION_FIELD_FLOOR.get(index, 0)
+        scaled = floor + (base - floor) * self.motion_speed / 100
+        return max(FX_VALUE_MIN, min(FX_VALUE_MAX, round(scaled)))
+
+    def _fx_unscale(self, index: int, value: int) -> int:
+        """Invert _fx_scale: the base that yields ``value`` at the current speed."""
+        if value == 0 or self.motion_speed <= 0:
+            return value
+        floor = MOTION_FIELD_FLOOR.get(index, 0)
+        base = floor + (value - floor) * 100 / self.motion_speed
+        return max(FX_VALUE_MIN, min(FX_VALUE_MAX, round(base)))
+
+    @property
+    def fx_values(self) -> dict[int, int]:
+        """The displayed/sent knob values: the base scaled by the motion speed."""
+        return {
+            index: self._fx_scale(index, self.motion_base.get(index, 0))
+            for index in TRANSFORM_KNOB_INDICES
+        }
+
     def _motion_cnf_values(self) -> list[int] | None:
         """Build the F0 config-block transform from the current knob values.
 
         Returns a 13-int cnf_values list, or None when all knobs are zero.
         Applied to our own SVG/shape/text draws to make them move.
         """
-        if not any(self.fx_values.get(i, 0) for i in TRANSFORM_KNOB_INDICES):
+        fx = self.fx_values
+        if not any(fx.values()):
             return None
         cnf = [0] * 13
         for index in TRANSFORM_KNOB_INDICES:
-            cnf[index] = self.fx_values.get(index, 0)
+            cnf[index] = fx[index]
         return cnf
 
     @property
     def motion_preset(self) -> str | None:
-        """Name of the preset whose values match the current knobs, else None."""
-        current = {i: self.fx_values.get(i, 0) for i in TRANSFORM_KNOB_INDICES}
+        """Name of the preset whose base matches the current base, else None."""
+        current = {i: self.motion_base.get(i, 0) for i in TRANSFORM_KNOB_INDICES}
         for name, preset in MOTION_PRESETS.items():
             target = {i: int(preset.get(i, 0)) for i in TRANSFORM_KNOB_INDICES}
             if current == target:
@@ -748,28 +782,37 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return None
 
     async def async_set_motion(self, mode: str) -> None:
-        """Apply a motion preset by populating the raw knobs from it."""
+        """Apply a motion preset by setting the base; speed then scales it."""
         if mode not in MOTION_PRESETS:
             raise LightElfLaserError(f"unknown motion preset {mode!r}")
         preset = MOTION_PRESETS[mode]
-        self.fx_values = {i: int(preset.get(i, 0)) for i in TRANSFORM_KNOB_INDICES}
-        self._persist_fx_values()
+        self.motion_base = {i: int(preset.get(i, 0)) for i in TRANSFORM_KNOB_INDICES}
+        self._persist_motion()
         await self._reapply_motion_if_drawing()
         self.async_update_listeners()
 
-    def _persist_fx_values(self) -> None:
+    def _persist_motion(self) -> None:
         self.hass.config_entries.async_update_entry(
             self.config_entry,
             options={
                 **self.config_entry.options,
-                "fx_values": {str(i): v for i, v in self.fx_values.items()},
+                "motion_base": {str(i): v for i, v in self.motion_base.items()},
+                "motion_speed": self.motion_speed,
             },
         )
 
     async def async_set_fx(self, index: int, value: int) -> None:
-        """Set a raw transform knob (0-255) and re-apply the current draw live."""
-        self.fx_values[index] = max(FX_VALUE_MIN, min(FX_VALUE_MAX, int(value)))
-        self._persist_fx_values()
+        """Set a displayed knob (0-255); stored as a speed-adjusted base."""
+        value = max(FX_VALUE_MIN, min(FX_VALUE_MAX, int(value)))
+        self.motion_base[index] = self._fx_unscale(index, value)
+        self._persist_motion()
+        await self._reapply_motion_if_drawing()
+        self.async_update_listeners()
+
+    async def async_set_motion_speed(self, value: int) -> None:
+        """Set the motion speed (1-100); rescales all knobs and re-applies live."""
+        self.motion_speed = max(MOTION_SPEED_MIN, min(MOTION_SPEED_MAX, int(value)))
+        self._persist_motion()
         await self._reapply_motion_if_drawing()
         self.async_update_listeners()
 
