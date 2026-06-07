@@ -109,31 +109,34 @@ SOUND_SENSITIVITY_MAX = 100
 # cnf index, the (slow, fast) band that the Motion speed slider sweeps -- speed
 # 1 = the slow end, 100 = the fast end -- so one slider takes a preset from its
 # slowest to its fastest. The displayed FX knobs are the resulting values, so
-# they move with the speed slider. idx: 7=zoom 8=rotate_z 9=rotate_x 10=rotate_y
-# 11=move_x 12=move_y. On this device_type=0 unit, rotate_z=vertical-axis spin,
-# rotate_y=horizontal-axis spin (rotate bands: 128-191 forward, 192-255 reverse),
-# move_x=barrel/cylinder warp, zoom(136-215)=loop scaling.
+# they move with the speed slider.
+# Field meanings, confirmed by hands-on testing on this device_type=0 unit
+# (the keys below are legacy/internal; the labels reflect observed behavior):
+#   7  = horizontal-axis spin   (0-127 static angle, 128-255 increasing speed)
+#   8  = vertical-axis spin     (0-127 static angle, 128-255 increasing speed)
+#   9  = horizontal scroll/wrap (0-127 static offset, 128-255 scroll speed)
+#   10 = vertical scroll/wrap   (0-127 static offset, 128-255 scroll speed)
+#   11 = barrel/cylinder warp
+#   12 = no visible effect on this unit
 MOTION_PRESETS = {
     "off": {},
-    "spin": {8: (128, 191)},                            # rotate_z forward spin
-    "spin_reverse": {8: (192, 255)},                    # rotate_z reverse spin
-    "flip": {10: (128, 255)},                           # rotate_y horizontal spin
-    "tumble": {8: (128, 191), 10: (128, 255)},          # both axes -> 3D tumble
-    "wobble": {9: (128, 255), 10: (128, 255)},          # rotate_x + rotate_y
-    "cylinder": {11: (80, 255)},                        # move_x barrel/cylinder warp
-    "throb": {7: (136, 215)},                           # zoom loop-scaling
-    "chaos": {8: (128, 191), 10: (128, 255), 11: (80, 255)},  # everything at once
+    "spin": {8: (130, 255)},                           # vertical-axis spin
+    "spin_h": {7: (130, 255)},                         # horizontal-axis spin
+    "tumble": {7: (130, 255), 8: (130, 255)},          # both spin axes
+    "scroll_x": {9: (130, 255)},                       # horizontal scroll
+    "scroll_y": {10: (130, 255)},                      # vertical scroll
+    "cylinder": {11: (80, 255)},                       # barrel/cylinder warp
+    "chaos": {7: (130, 255), 8: (130, 255), 9: (150, 255)},  # spins + scroll
 }
 MOTION_MODES = tuple(MOTION_PRESETS)
 MOTION_MODE_LABELS = {
     "off": "Off",
-    "spin": "Spin",
-    "spin_reverse": "Spin (reverse)",
-    "flip": "Flip",
+    "spin": "Spin (vertical)",
+    "spin_h": "Spin (horizontal)",
     "tumble": "Tumble",
-    "wobble": "Wobble",
+    "scroll_x": "Scroll X",
+    "scroll_y": "Scroll Y",
     "cylinder": "Cylinder",
-    "throb": "Throb",
     "chaos": "Chaos",
 }
 MOTION_CUSTOM_LABEL = "Custom"
@@ -144,19 +147,18 @@ MOTION_SPEED_MIN = 1
 MOTION_SPEED_MAX = 100
 DEFAULT_MOTION_SPEED = 50
 
-# Raw transform "knobs" — the displayed/scaled draw-transform values. Full
-# 0-255 range so EVERY behavior band is reachable (static position/warp AND
-# continuous-motion speed). Motion presets populate the base and the speed
-# slider scales these; hand-editing one makes the Motion picker read "Custom".
-# (key, label, cnf_index). idx: 7=zoom 8=rotate_z 9=rotate_x 10=rotate_y
-# 11=move_x 12=move_y.
+# Raw transform "knobs" — direct 0-255 access to each cnf field, so you can set
+# a static position (0-127) as well as a motion speed (128-255). Motion presets
+# populate these via the speed slider; hand-editing one reads "Custom". Labels
+# reflect observed behavior; keys are legacy/internal (kept stable so entity ids
+# don't churn). (key, label, cnf_index).
 TRANSFORM_KNOBS = (
-    ("fx_zoom", "FX zoom (7)", 7),
-    ("fx_rotate_z", "FX rotate-Z / vertical spin (8)", 8),
-    ("fx_rotate_x", "FX rotate-X (9)", 9),
-    ("fx_rotate_y", "FX rotate-Y / horizontal spin (10)", 10),
-    ("fx_move_x", "FX move/warp-X (11)", 11),
-    ("fx_move_y", "FX move/warp-Y (12)", 12),
+    ("fx_zoom", "Horizontal spin (7)", 7),
+    ("fx_rotate_z", "Vertical spin (8)", 8),
+    ("fx_rotate_x", "Scroll X (9)", 9),
+    ("fx_rotate_y", "Scroll Y (10)", 10),
+    ("fx_move_x", "Cylinder / warp (11)", 11),
+    ("fx_move_y", "Move Y (12, no effect)", 12),
 )
 TRANSFORM_KNOB_INDICES = tuple(index for *_, index in TRANSFORM_KNOBS)
 FX_VALUE_MIN = 0
