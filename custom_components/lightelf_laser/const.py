@@ -136,8 +136,8 @@ MOTION_MODE_LABELS = {
     "spin": "Spin (vertical)",
     "spin_h": "Spin (horizontal)",
     "zoom": "Zoom",
-    "scroll_x": "Scroll X",
-    "scroll_y": "Scroll Y",
+    "scroll_x": "Horizontal scroll",
+    "scroll_y": "Vertical scroll",
     "warp": "Warp",
     "chaos": "Chaos",
 }
@@ -157,8 +157,8 @@ DEFAULT_MOTION_SPEED = 50
 TRANSFORM_KNOBS = (
     ("fx_zoom", "Horizontal spin", 7),
     ("fx_rotate_z", "Vertical spin", 8),
-    ("fx_rotate_x", "Scroll X", 9),
-    ("fx_rotate_y", "Scroll Y", 10),
+    ("fx_rotate_x", "Horizontal scroll", 9),
+    ("fx_rotate_y", "Vertical scroll", 10),
     ("fx_move_x", "Warp", 11),
 )
 TRANSFORM_KNOB_INDICES = tuple(index for *_, index in TRANSFORM_KNOBS)
