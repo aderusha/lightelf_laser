@@ -23,6 +23,8 @@ from .const import (
     DEFAULT_DRAW_SCALE,
     DEFAULT_MOTION_SPEED,
     DEFAULT_NATIVE_ANIMATION_FAMILY,
+    DMX_ADDRESS_MAX,
+    DMX_ADDRESS_MIN,
     DEFAULT_NATIVE_ANIMATION_INDEX,
     DEFAULT_NATIVE_ANIMATION_SPEED,
     DEFAULT_SCROLL_SPEED,
@@ -234,6 +236,9 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Projector-global mount orientation. This xy byte controls normal,
         # flipped, and 90-degree rotated output and is read back from query.
         self.mount_xy = MOUNT_ORIENTATION_OPTIONS["Normal"]
+
+        # DMX-512 start address (base channel), read back from query.
+        self.dmx_address = DMX_ADDRESS_MIN
 
         super().__init__(
             hass,
@@ -538,6 +543,24 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         await self.async_request_refresh()
 
+    async def async_set_dmx_address(self, address: int) -> None:
+        """Set the projector's DMX-512 start address (base channel)."""
+        address = max(DMX_ADDRESS_MIN, min(DMX_ADDRESS_MAX, int(address)))
+        response = await self.client.request("settings", {"dmx_address": address})
+        data = response.get("data") or {}
+        self.dmx_address = int(data.get("dmx_address", address))
+        self.async_set_updated_data(
+            {
+                **(self.data or {}),
+                "connection_enabled": self.connection_enabled,
+                "connected": True,
+                "can_send": True,
+                "available": True,
+                "dmx_address": self.dmx_address,
+            }
+        )
+        await self.async_request_refresh()
+
     async def async_set_invert_x(self, enabled: bool) -> None:
         """Toggle X inversion using the non-rotated orientation presets."""
         await self.async_set_mount_xy(_xy_from_invert_switches(enabled, self.invert_y))
@@ -668,6 +691,8 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         device_on = bool(data.get("device_on", self.is_on))
         if data.get("settings_xy") is not None:
             self.mount_xy = int(data["settings_xy"])
+        if data.get("settings_dmx_address") is not None:
+            self.dmx_address = int(data["settings_dmx_address"])
         mode_state = data.get("mode_state")
         self.is_on = device_on
         return {
@@ -677,6 +702,7 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "available": True,
             "device_on": device_on,
             "mount_xy": self.mount_xy,
+            "dmx_address": self.dmx_address,
             "mode_state": mode_state,
         }
 

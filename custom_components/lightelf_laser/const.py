@@ -170,6 +170,12 @@ DRAW_SCALE_MIN = 10
 DRAW_SCALE_MAX = 100
 DEFAULT_DRAW_SCALE = 100
 
+# DMX-512 start address (base channel). Settable over BLE via the device
+# settings block and read back from the device query. Only relevant when the
+# laser is patched into a DMX universe (16-channel fixture).
+DMX_ADDRESS_MIN = 1
+DMX_ADDRESS_MAX = 512
+
 # Projector mount-orientation setting values, not host-side coordinate
 # transforms.
 MOUNT_ORIENTATION_OPTIONS = {

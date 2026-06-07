@@ -38,6 +38,8 @@ The integration creates a compact Home Assistant control surface:
   active transform (the FX knobs move to reflect it).
 - `number.lightelf_laser_fx_*`: raw transform knobs (zoom, rotate-Z/X/Y,
   move/warp-X/Y, 0-255) for fine control; a preset populates these.
+- `number.lightelf_laser_dmx_address`: DMX-512 start address / base channel
+  (1-512); only relevant when the laser is on a DMX rig.
 
 Entity IDs may differ if Home Assistant assigns a suffix.
 
@@ -121,3 +123,11 @@ These shape your own drawn content — SVGs, vector text, and built-in shapes
 
 Size, Motion, and the FX knobs persist across restarts and re-apply to the
 current drawing the moment you change them.
+
+## DMX Address
+
+If you run the projector on a DMX-512 lighting rig, **DMX address**
+(`number.lightelf_laser_dmx_address`) sets its start address / base channel
+(1-512). It is written to the device and read back from it, so you can patch the
+fixture from Home Assistant instead of the device menu. It has no effect unless
+the projector is receiving DMX.

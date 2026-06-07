@@ -9,10 +9,13 @@ from homeassistant.components.number import (
     NumberEntityDescription,
     NumberMode,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
+    DMX_ADDRESS_MAX,
+    DMX_ADDRESS_MIN,
     DRAW_SCALE_MAX,
     DRAW_SCALE_MIN,
     FX_VALUE_MAX,
@@ -117,6 +120,7 @@ async def async_setup_entry(
     entities.append(EytseSoundSensitivityNumber(coordinator))
     entities.append(EytseDrawScaleNumber(coordinator))
     entities.append(EytseMotionSpeedNumber(coordinator))
+    entities.append(EytseDmxAddressNumber(coordinator))
     entities.extend(
         EytseFxKnobNumber(coordinator, key, label, index)
         for key, label, index in TRANSFORM_KNOBS
@@ -277,6 +281,40 @@ class EytseMotionSpeedNumber(EytseLaserEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Persist the motion speed and re-apply the current draw."""
         await self.coordinator.async_set_motion_speed(int(value))
+
+
+class EytseDmxAddressNumber(EytseLaserEntity, NumberEntity):
+    """DMX-512 start address (base channel), 1-512.
+
+    A device config value written to the projector over BLE and read back from
+    its query. Only relevant when the laser is patched into a DMX universe.
+    """
+
+    _attr_name = "DMX address"
+    _attr_icon = "mdi:tune-vertical"
+    _attr_mode = NumberMode.BOX
+    _attr_native_min_value = DMX_ADDRESS_MIN
+    _attr_native_max_value = DMX_ADDRESS_MAX
+    _attr_native_step = 1
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator) -> None:
+        """Initialize the DMX-address control."""
+        super().__init__(coordinator, "dmx_address")
+
+    @property
+    def available(self) -> bool:
+        """Editable whenever HA holds the connection (not gated on last poll)."""
+        return bool(self.coordinator.connection_enabled)
+
+    @property
+    def native_value(self) -> float:
+        """Return the device's current DMX start address."""
+        return int(self.coordinator.dmx_address)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Write the DMX start address to the device."""
+        await self.coordinator.async_set_dmx_address(int(value))
 
 
 class EytseFxKnobNumber(EytseLaserEntity, NumberEntity):

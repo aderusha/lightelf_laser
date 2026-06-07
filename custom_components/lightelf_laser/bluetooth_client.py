@@ -402,8 +402,10 @@ class LightElfBluetoothClient:
                 await self._query_locked()
             current = self._settings_state
             xy = int(args.get("xy", current.xy if current else 0))
+            dmx_address = int(args.get("dmx_address", current.dmx_address if current else 1))
+            dmx_address = max(1, min(512, dmx_address))
             kwargs = {
-                "dmx_address": current.dmx_address if current else 1,
+                "dmx_address": dmx_address,
                 "channel": current.channel if current else 0,
                 "display_size": current.display_size if current else 10,
                 "xy": xy,
@@ -421,8 +423,8 @@ class LightElfBluetoothClient:
             }
             await self._write_script_locked(settings_command(**kwargs))
             if current is not None:
-                self._settings_state = replace(current, xy=xy)
-            return {"xy": xy}
+                self._settings_state = replace(current, xy=xy, dmx_address=dmx_address)
+            return {"xy": xy, "dmx_address": dmx_address}
 
     async def _cancel_loop(self) -> None:
         if self._loop_task is None:
@@ -499,6 +501,7 @@ class LightElfBluetoothClient:
                     "device_type": parsed.device_type,
                     "version": parsed.version,
                     "settings_xy": settings.xy if settings else None,
+                    "settings_dmx_address": settings.dmx_address if settings else None,
                     "mode_state": self._mode_state_data(),
                     CONF_ADDRESS: self.address,
                     "transport": "bluetooth",
