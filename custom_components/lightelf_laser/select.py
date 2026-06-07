@@ -8,6 +8,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
     COLOR_OPTIONS,
+    MOTION_CUSTOM_LABEL,
+    MOTION_MODE_LABELS,
+    MOTION_MODES,
     MOUNT_ORIENTATION_OPTIONS,
     NATIVE_ANIMATION_FAMILIES,
     SHAPE_COLOR_OPTIONS,
@@ -39,6 +42,7 @@ async def async_setup_entry(
             EytseShapeColorSelect(coordinator),
             EytseNativeAnimationFamilySelect(coordinator),
             EytseTextModeSelect(coordinator),
+            EytseMotionSelect(coordinator),
             EytseMountOrientationSelect(coordinator),
         ]
     )
@@ -281,6 +285,44 @@ class EytseTextModeSelect(EytseLaserEntity, SelectEntity):
         """Remember the chosen text mode."""
         self.coordinator.text_mode = option
         self.coordinator.async_update_listeners()
+
+
+class EytseMotionSelect(EytseLaserEntity, SelectEntity):
+    """Live motion applied to SVG/shape/text draws.
+
+    Each preset populates the raw transform knobs; the knobs stay the source of
+    truth, so once you hand-tweak a knob this shows "Custom". The transform runs
+    firmware-side and re-issues the current draw live. Does not affect
+    firmware-native animations.
+    """
+
+    _attr_name = "Motion"
+    _attr_icon = "mdi:rotate-3d-variant"
+    _attr_options = [MOTION_MODE_LABELS[mode] for mode in MOTION_MODES] + [MOTION_CUSTOM_LABEL]
+    _labels_to_mode = {label: mode for mode, label in MOTION_MODE_LABELS.items()}
+
+    def __init__(self, coordinator) -> None:
+        """Initialize the motion selector."""
+        super().__init__(coordinator, "motion")
+
+    @property
+    def available(self) -> bool:
+        """Selectable even when the radio is released (applied on next draw)."""
+        return True
+
+    @property
+    def current_option(self) -> str:
+        """Return the matching preset's label, or Custom when knobs are hand-set."""
+        preset = self.coordinator.motion_preset
+        if preset is None:
+            return MOTION_CUSTOM_LABEL
+        return MOTION_MODE_LABELS.get(preset, MOTION_CUSTOM_LABEL)
+
+    async def async_select_option(self, option: str) -> None:
+        """Apply a preset (populating the knobs). Selecting Custom is a no-op."""
+        if option == MOTION_CUSTOM_LABEL:
+            return
+        await self.coordinator.async_set_motion(self._labels_to_mode[option])
 
 
 class EytseMountOrientationSelect(EytseLaserEntity, SelectEntity):

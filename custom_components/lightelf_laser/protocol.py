@@ -687,6 +687,7 @@ def draw_points_command(
     play_time: float | None = None,
     save_tag: int = 0,
     stop_markers: bool = True,
+    scale: float = 1.0,
 ) -> str:
     """Build an F0/F4 hand-draw command for projector-space points.
 
@@ -723,6 +724,9 @@ def draw_points_command(
             if len(point) != 4:
                 raise ValueError("draw points must be x, y, color/control, blanking/control")
             x_value, y_value, color, blanking = point
+            if scale != 1.0:
+                x_value = round(x_value * scale)
+                y_value = round(y_value * scale)
             low = int(blanking)
             if stop_markers and not cmd_new_type:
                 # Apply the stop-marker low-nibble pass.

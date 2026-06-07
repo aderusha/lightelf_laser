@@ -599,6 +599,8 @@ def svg_draw_command(
     red_color: int | None = None,
     override_color: int | None = None,
     cmd_new_type: bool = False,
+    cnf_values: list[int] | None = None,
+    scale: float = 1.0,
 ) -> str:
     drawing = read_svg(
         path,
@@ -627,7 +629,9 @@ def svg_draw_command(
         initial_tolerance=simplify_tolerance,
     )
     points = drawing_to_points(fitted, steps_per_segment=steps_per_segment)
-    return draw_points_command(points, cmd_new_type=cmd_new_type)
+    return draw_points_command(
+        points, cnf_values=cnf_values, cmd_new_type=cmd_new_type, scale=scale
+    )
 
 
 __all__ = [

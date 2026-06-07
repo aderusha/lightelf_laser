@@ -84,3 +84,16 @@ speed value, and the sensitivity byte (a 0-100 percentage scaled to 0-255) sets
 the microphone gain. No audio is streamed from the host; the reactivity is
 entirely firmware-side. The setting is global and applies to whichever effect is
 currently playing.
+
+## Draw Transforms
+
+The leading 16-byte config block of an F0 hand-draw command carries per-drawing
+geometric transform parameters (the cnfValus). On the observed `device_type=0`
+unit, the rotation fields produce continuous firmware-driven motion: index 8
+(rotate-Z) is a vertical-axis spin, index 10 (rotate-Y) a horizontal-axis spin,
+and combining them yields a 3D tumble; index 11 (move-X) at high values warps
+the drawing into a barrel/cylinder, and index 7 (zoom) in its upper band loops a
+scaling pulse. These run projector-side, so the controller sets them once per
+draw. Static uniform resizing is done host-side by scaling the draw-point
+coordinates before transmission, which is more predictable than the firmware
+size fields on this hardware.

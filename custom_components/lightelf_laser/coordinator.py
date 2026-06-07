@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,7 @@ from .const import (
     BUILTIN_THUMB_DIR,
     COLOR_OPTIONS,
     CONF_TIMEOUT,
+    DEFAULT_DRAW_SCALE,
     DEFAULT_NATIVE_ANIMATION_FAMILY,
     DEFAULT_NATIVE_ANIMATION_INDEX,
     DEFAULT_NATIVE_ANIMATION_SPEED,
@@ -36,7 +38,12 @@ from .const import (
     DEFAULT_TEXT_Y,
     DEFAULT_TIMEOUT,
     DOMAIN,
+    DRAW_SCALE_MAX,
+    DRAW_SCALE_MIN,
+    FX_VALUE_MAX,
+    FX_VALUE_MIN,
     LOGGER,
+    MOTION_PRESETS,
     MOUNT_ORIENTATION_BY_XY,
     MOUNT_ORIENTATION_OPTIONS,
     NATIVE_ANIMATION_CATALOG_FILE,
@@ -51,6 +58,7 @@ from .const import (
     STARTER_SVG_DIR,
     SVG_LEGACY_SUBDIR,
     SVG_MEDIA_SUBDIR,
+    TRANSFORM_KNOB_INDICES,
     TRANSPORT_BLUETOOTH,
     UPDATE_INTERVAL,
 )
@@ -201,6 +209,19 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             entry.options.get("sound_sensitivity", DEFAULT_SOUND_SENSITIVITY)
         )
         self._native_animation_active = False
+
+        # Live effect transforms applied to our own draws (SVG/shape/text). The
+        # raw knobs (fx_values) are the single source of truth; the Motion preset
+        # picker just populates them. Persisted in entry.options under fx_values.
+        # The last-draw callback lets a knob/preset change re-issue the current
+        # draw live.
+        stored_fx = entry.options.get("fx_values", {}) or {}
+        self.fx_values = {
+            index: int(stored_fx.get(str(index), 0)) for index in TRANSFORM_KNOB_INDICES
+        }
+        # Host-side static draw scale (percent); shrinks SVG/shape/text uniformly.
+        self.draw_scale = int(entry.options.get("draw_scale", DEFAULT_DRAW_SCALE))
+        self._last_draw: Callable[[], Awaitable[None]] | None = None
 
         # Projector-global mount orientation. This xy byte controls normal,
         # flipped, and 90-degree rotated output and is read back from query.
@@ -537,6 +558,7 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.is_on = True
         self._native_animation_active = True
+        self._last_draw = None
         await self.async_request_refresh()
 
     async def async_display_shape(self) -> None:
@@ -548,16 +570,26 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # None -> preserve the shape's own per-point colors; else force one color.
         color_id = None if self.builtin_color == "original" else COLOR_OPTIONS.get(self.builtin_color, 5)
         command = await self.hass.async_add_executor_job(
-            self._build_shape_command, points, color_id
+            self._build_shape_command,
+            points,
+            color_id,
+            self._motion_cnf_values(),
+            self.draw_scale_factor,
         )
         await self.client.request("power", {"on": True})
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
+        self._last_draw = self.async_display_shape
         await self.async_request_refresh()
 
     @staticmethod
-    def _build_shape_command(points: list[list[int]], color_id: int | None) -> str:
+    def _build_shape_command(
+        points: list[list[int]],
+        color_id: int | None,
+        cnf_values: list[int] | None = None,
+        scale: float = 1.0,
+    ) -> str:
         """Fit a built-in frame to the projector and build the draw command.
 
         ``color_id`` None preserves each point's own color (most built-in shapes
@@ -569,7 +601,7 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ys = [p[1] for p in points]
         max_x = max(abs(min(xs)), abs(max(xs))) or 1
         max_y = max(abs(min(ys)), abs(max(ys))) or 1
-        scale = min(1.0, PROJECTOR_LIMIT / max_x, PROJECTOR_LIMIT / max_y)
+        fit = min(1.0, PROJECTOR_LIMIT / max_x, PROJECTOR_LIMIT / max_y)
 
         def out_color(raw: int) -> int:
             if raw == 0:
@@ -579,11 +611,13 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return raw if 1 <= raw <= 7 else ((raw - 1) % 7) + 1
 
         recolored = [
-            [round(p[0] * scale), round(p[1] * scale), out_color(int(p[2])), 0]
+            [round(p[0] * fit), round(p[1] * fit), out_color(int(p[2])), 0]
             for p in points
         ]
         recolored = _fit_point_budget(recolored, DRAW_POINT_BUDGET)
-        return draw_points_command(recolored, cmd_new_type=False)
+        return draw_points_command(
+            recolored, cnf_values=cnf_values, cmd_new_type=False, scale=scale
+        )
 
     # -- coordinator update -------------------------------------------------
 
@@ -690,6 +724,75 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self.is_on and self._native_animation_active and self.connection_enabled:
             await self.async_display_native_animation()
 
+    def _motion_cnf_values(self) -> list[int] | None:
+        """Build the F0 config-block transform from the current knob values.
+
+        Returns a 13-int cnf_values list, or None when all knobs are zero.
+        Applied to our own SVG/shape/text draws to make them move.
+        """
+        if not any(self.fx_values.get(i, 0) for i in TRANSFORM_KNOB_INDICES):
+            return None
+        cnf = [0] * 13
+        for index in TRANSFORM_KNOB_INDICES:
+            cnf[index] = self.fx_values.get(index, 0)
+        return cnf
+
+    @property
+    def motion_preset(self) -> str | None:
+        """Name of the preset whose values match the current knobs, else None."""
+        current = {i: self.fx_values.get(i, 0) for i in TRANSFORM_KNOB_INDICES}
+        for name, preset in MOTION_PRESETS.items():
+            target = {i: int(preset.get(i, 0)) for i in TRANSFORM_KNOB_INDICES}
+            if current == target:
+                return name
+        return None
+
+    async def async_set_motion(self, mode: str) -> None:
+        """Apply a motion preset by populating the raw knobs from it."""
+        if mode not in MOTION_PRESETS:
+            raise LightElfLaserError(f"unknown motion preset {mode!r}")
+        preset = MOTION_PRESETS[mode]
+        self.fx_values = {i: int(preset.get(i, 0)) for i in TRANSFORM_KNOB_INDICES}
+        self._persist_fx_values()
+        await self._reapply_motion_if_drawing()
+        self.async_update_listeners()
+
+    def _persist_fx_values(self) -> None:
+        self.hass.config_entries.async_update_entry(
+            self.config_entry,
+            options={
+                **self.config_entry.options,
+                "fx_values": {str(i): v for i, v in self.fx_values.items()},
+            },
+        )
+
+    async def async_set_fx(self, index: int, value: int) -> None:
+        """Set a raw transform knob (0-255) and re-apply the current draw live."""
+        self.fx_values[index] = max(FX_VALUE_MIN, min(FX_VALUE_MAX, int(value)))
+        self._persist_fx_values()
+        await self._reapply_motion_if_drawing()
+        self.async_update_listeners()
+
+    @property
+    def draw_scale_factor(self) -> float:
+        """Current host-side draw scale as a 0.1-1.0 multiplier."""
+        return max(DRAW_SCALE_MIN, min(DRAW_SCALE_MAX, self.draw_scale)) / 100
+
+    async def async_set_draw_scale(self, value: int) -> None:
+        """Set the host-side draw scale (percent) and re-apply the current draw."""
+        self.draw_scale = max(DRAW_SCALE_MIN, min(DRAW_SCALE_MAX, int(value)))
+        self.hass.config_entries.async_update_entry(
+            self.config_entry,
+            options={**self.config_entry.options, "draw_scale": self.draw_scale},
+        )
+        await self._reapply_motion_if_drawing()
+        self.async_update_listeners()
+
+    async def _reapply_motion_if_drawing(self) -> None:
+        """Re-issue the last SVG/shape/text draw so a motion change shows live."""
+        if self.is_on and self._last_draw is not None and self.connection_enabled:
+            await self._last_draw()
+
     async def async_power(self, on: bool) -> None:
         """Turn laser output on or off."""
         if on:
@@ -699,6 +802,7 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # stop native animations and update the real device_on byte.
             await self.client.request("raw", {"hex": "B0B1B2B300B4B5B6B7"})
             self._native_animation_active = False
+            self._last_draw = None
         self.is_on = on
         self.async_set_updated_data(
             {
@@ -719,16 +823,26 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         path = str(self.svg_dir / self.selected_svg)
         color_id = None if self.svg_color == "original" else COLOR_OPTIONS.get(self.svg_color, 5)
         command = await self.hass.async_add_executor_job(
-            self._build_svg_command, path, color_id
+            self._build_svg_command,
+            path,
+            color_id,
+            self._motion_cnf_values(),
+            self.draw_scale_factor,
         )
         await self.client.request("power", {"on": True})
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
+        self._last_draw = self.async_display_svg
         await self.async_request_refresh()
 
     @staticmethod
-    def _build_svg_command(path: str, color_id: int | None) -> str:
+    def _build_svg_command(
+        path: str,
+        color_id: int | None,
+        cnf_values: list[int] | None = None,
+        scale: float = 1.0,
+    ) -> str:
         """Convert an SVG file to an F0/F4 draw command (executor context)."""
         # Keep the point budget transmission-safe (see DRAW_POINT_BUDGET); the
         # SVG path has its own geometry-aware simplification to hit it.
@@ -737,6 +851,8 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             max_points=DRAW_POINT_BUDGET,
             override_color=color_id,
             cmd_new_type=False,
+            cnf_values=cnf_values,
+            scale=scale,
         )
 
     async def async_display_text(self) -> None:
@@ -760,16 +876,25 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             int(self.text_size),
             color_id,
             int(self.text_y),
+            self._motion_cnf_values(),
+            self.draw_scale_factor,
         )
         await self.client.request("power", {"on": True})
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
+        self._last_draw = self.async_display_text
         await self.async_request_refresh()
 
     @staticmethod
     def _build_text_command(
-        text: str, font: str, size: int, color_id: int | None, text_y: int
+        text: str,
+        font: str,
+        size: int,
+        color_id: int | None,
+        text_y: int,
+        cnf_values: list[int] | None = None,
+        scale: float = 1.0,
     ) -> str:
         """Render Hershey text to an F0/F4 draw command (executor context).
 
@@ -785,17 +910,19 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ys = [point[1] for stroke in segments for point in stroke]
         max_x = max(abs(min(xs)), abs(max(xs))) or 1.0
         max_y = max(abs(min(ys)), abs(max(ys))) or 1.0
-        scale = min(1.0, PROJECTOR_LIMIT / max_x, PROJECTOR_LIMIT / max_y)
+        fit = min(1.0, PROJECTOR_LIMIT / max_x, PROJECTOR_LIMIT / max_y)
 
         fitted = [
-            [[point[0] * scale, point[1] * scale + text_y] for point in stroke]
+            [[point[0] * fit, point[1] * fit + text_y] for point in stroke]
             for stroke in segments
         ]
         points = segments_to_points(fitted, color=color_id or 7, steps_per_segment=2)
         points = _fit_point_budget(points, DRAW_POINT_BUDGET)
         if color_id is None:
             points = _rainbow_recolor(points)
-        return draw_points_command(points, cmd_new_type=False)
+        return draw_points_command(
+            points, cnf_values=cnf_values, cmd_new_type=False, scale=scale
+        )
 
     async def _display_scroll_text(self, direction: int) -> None:
         """Marquee the current text via firmware scrolling (powers on).
@@ -827,4 +954,5 @@ class EytseLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("raw", {"hex": c0})
         self.is_on = True
         self._native_animation_active = False
+        self._last_draw = None
         await self.async_request_refresh()

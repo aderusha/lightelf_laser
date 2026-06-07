@@ -13,12 +13,17 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
+    DRAW_SCALE_MAX,
+    DRAW_SCALE_MIN,
+    FX_VALUE_MAX,
+    FX_VALUE_MIN,
     SOUND_SENSITIVITY_MAX,
     SOUND_SENSITIVITY_MIN,
     TEXT_SIZE_MAX,
     TEXT_SIZE_MIN,
     TEXT_Y_MAX,
     TEXT_Y_MIN,
+    TRANSFORM_KNOBS,
 )
 from .coordinator import EytseLaserConfigEntry
 from .entity import EytseLaserEntity
@@ -108,6 +113,11 @@ async def async_setup_entry(
         EytseNumber(coordinator, description) for description in NUMBERS
     ]
     entities.append(EytseSoundSensitivityNumber(coordinator))
+    entities.append(EytseDrawScaleNumber(coordinator))
+    entities.extend(
+        EytseFxKnobNumber(coordinator, key, label, index)
+        for key, label, index in TRANSFORM_KNOBS
+    )
     async_add_entities(entities)
 
 
@@ -196,3 +206,72 @@ class EytseSoundSensitivityNumber(EytseLaserEntity, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Persist the sensitivity and re-apply if sound mode is active."""
         await self.coordinator.async_set_sound_sensitivity(int(value))
+
+
+class EytseDrawScaleNumber(EytseLaserEntity, NumberEntity):
+    """Static size for drawn content (SVG/shape/text), as a percent.
+
+    Host-side uniform scale of the draw points (100 = full auto-fit size, lower =
+    smaller). Persisted; re-applies to the current draw on change.
+    """
+
+    _attr_name = "Size"
+    _attr_icon = "mdi:resize"
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_min_value = DRAW_SCALE_MIN
+    _attr_native_max_value = DRAW_SCALE_MAX
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = "%"
+
+    def __init__(self, coordinator) -> None:
+        """Initialize the size slider."""
+        super().__init__(coordinator, "draw_scale")
+
+    @property
+    def available(self) -> bool:
+        """Editable even when the radio is released (applied on next draw)."""
+        return True
+
+    @property
+    def native_value(self) -> float:
+        """Return the current draw scale percent."""
+        return int(self.coordinator.draw_scale)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Persist the draw scale and re-apply the current draw."""
+        await self.coordinator.async_set_draw_scale(int(value))
+
+
+class EytseFxKnobNumber(EytseLaserEntity, NumberEntity):
+    """A raw transform knob (one F0 config-block / cnfValus byte, 0-255).
+
+    For live exploration: any non-zero knob overrides the Motion preset and is
+    applied to SVG/shape/text draws. Re-applies to the current draw on change.
+    """
+
+    _attr_icon = "mdi:tune-variant"
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_min_value = FX_VALUE_MIN
+    _attr_native_max_value = FX_VALUE_MAX
+    _attr_native_step = 1
+    _attr_entity_registry_enabled_default = True
+
+    def __init__(self, coordinator, key: str, label: str, index: int) -> None:
+        """Initialize a raw transform-knob slider."""
+        super().__init__(coordinator, key)
+        self._index = index
+        self._attr_name = label
+
+    @property
+    def available(self) -> bool:
+        """Editable even when the radio is released (applied on next draw)."""
+        return True
+
+    @property
+    def native_value(self) -> float:
+        """Return the current knob value."""
+        return int(self.coordinator.fx_values.get(self._index, 0))
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set this knob and re-apply the current draw live."""
+        await self.coordinator.async_set_fx(self._index, int(value))

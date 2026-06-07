@@ -103,6 +103,65 @@ DEFAULT_SOUND_SENSITIVITY = 50
 SOUND_SENSITIVITY_MIN = 1
 SOUND_SENSITIVITY_MAX = 100
 
+# Live effect transforms. The 16-byte config block at the head of every F0
+# hand-draw command (cnfValus) carries firmware-driven geometric transforms; we
+# apply them to our own SVG/shape/text draws. The raw knobs (TRANSFORM_KNOBS,
+# below) are the single source of truth; motion presets just populate them, so
+# the picker shows "Custom" once a knob is hand-tweaked. Each preset maps
+# cnf_index -> value. idx: 7=zoom 8=rotate_z 9=rotate_x 10=rotate_y 11=move_x
+# 12=move_y. On this device_type=0 unit, rotate_z=vertical-axis spin, rotate_y=
+# horizontal-axis spin, move_x(high)=barrel/cylinder warp, zoom(136-215)=loop
+# scaling; values are tuned starting points and remain editable via the knobs.
+MOTION_PRESETS = {
+    "off": {},
+    "spin": {8: 150},                      # vertical-axis spin (chill)
+    "spin_reverse": {8: 215},              # reverse vertical-axis spin
+    "flip": {10: 150},                     # horizontal-axis spin
+    "tumble": {8: 150, 10: 150},           # both axes -> 3D tumble
+    "wobble": {9: 150, 10: 150},           # rotate_x + rotate_y
+    "cylinder": {11: 220},                 # move_x warp / cylinder wrap
+    "throb": {7: 155},                     # zoom loop-scaling
+    "chaos": {8: 160, 10: 150, 11: 180},   # everything at once
+}
+MOTION_MODES = tuple(MOTION_PRESETS)
+MOTION_MODE_LABELS = {
+    "off": "Off",
+    "spin": "Spin",
+    "spin_reverse": "Spin (reverse)",
+    "flip": "Flip",
+    "tumble": "Tumble",
+    "wobble": "Wobble",
+    "cylinder": "Cylinder",
+    "throb": "Throb",
+    "chaos": "Chaos",
+}
+MOTION_CUSTOM_LABEL = "Custom"
+
+# Raw transform "knobs" — the source of truth for the draw transform. Full
+# 0-255 range so EVERY behavior band is reachable (static position/warp AND
+# continuous-motion speed). Motion presets populate these; hand-editing one
+# makes the Motion picker read "Custom". (key, label, cnf_index). idx: 7=zoom
+# 8=rotate_z 9=rotate_x 10=rotate_y 11=move_x 12=move_y.
+TRANSFORM_KNOBS = (
+    ("fx_zoom", "FX zoom (7)", 7),
+    ("fx_rotate_z", "FX rotate-Z / vertical spin (8)", 8),
+    ("fx_rotate_x", "FX rotate-X (9)", 9),
+    ("fx_rotate_y", "FX rotate-Y / horizontal spin (10)", 10),
+    ("fx_move_x", "FX move/warp-X (11)", 11),
+    ("fx_move_y", "FX move/warp-Y (12)", 12),
+)
+TRANSFORM_KNOB_INDICES = tuple(index for *_, index in TRANSFORM_KNOBS)
+FX_VALUE_MIN = 0
+FX_VALUE_MAX = 255
+
+# Host-side draw scale (percent) for SVG/shape/text. Multiplies the final draw
+# points uniformly (x and y) -- a reliable static resize, since the firmware
+# size/zoom fields don't scale cleanly on this unit. 100 = full auto-fit size,
+# lower = smaller. Applied after the auto-fit-to-projector step.
+DRAW_SCALE_MIN = 10
+DRAW_SCALE_MAX = 100
+DEFAULT_DRAW_SCALE = 100
+
 # Projector mount-orientation setting values, not host-side coordinate
 # transforms.
 MOUNT_ORIENTATION_OPTIONS = {

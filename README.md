@@ -26,6 +26,8 @@ animations from Home Assistant, with previews before you light the wall.
 - **Firmware-native animations** with captured previews.
 - **Sound-reactive mode** that drives the active effect from the projector's
   onboard microphone, with an adjustable sensitivity.
+- **Live transforms** for your drawings — spin, flip, tumble, cylinder-wrap, and
+  more — plus a static size control, all firmware-driven.
 - **BLE Connection Control** so Home Assistant can release the projector for mobile app access.
 
 ## Installation

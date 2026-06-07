@@ -31,6 +31,11 @@ The integration creates a compact Home Assistant control surface:
 - `switch.lightelf_laser_sound_reactive`: drive the active effect from the
   onboard microphone instead of a fixed speed.
 - `number.lightelf_laser_sound_sensitivity`: microphone sensitivity (1-100).
+- `number.lightelf_laser_size`: static size for drawn content (10-100%).
+- `select.lightelf_laser_motion`: live motion for drawn content (Off / Spin /
+  Flip / Tumble / Wobble / Cylinder / Throb / Chaos / Custom).
+- `number.lightelf_laser_fx_*`: raw transform knobs (zoom, rotate-Z/X/Y,
+  move/warp-X/Y, 0-255) for fine control; a preset populates these.
 
 Entity IDs may differ if Home Assistant assigns a suffix.
 
@@ -93,3 +98,22 @@ best with the firmware-native animations. Effects with lots of motion react most
 visibly; static or title-card patterns barely change. If a firmware effect is
 already running when you toggle the switch or change the sensitivity, the effect
 is re-issued so the new setting takes effect immediately.
+
+## Size and Motion (drawn content)
+
+These shape your own drawn content — SVGs, vector text, and built-in shapes
+(not the firmware-native animations).
+
+- **Size** (`number.lightelf_laser_size`, 10-100%) statically scales the drawing
+  uniformly, so you can make a logo or shape smaller to fit your wall.
+- **Motion** (`select.lightelf_laser_motion`) applies a firmware-driven live
+  transform to the drawing: **Spin**/**Flip** (rotation), **Tumble** (3D),
+  **Cylinder** (wrap), and a few more. Motion runs projector-side and composes
+  with Size.
+- The **FX knobs** (`number.lightelf_laser_fx_*`, 0-255) are the underlying
+  transform parameters. A Motion preset just fills them in; nudge a knob for
+  fine control and the Motion picker will read **Custom**. Set them all to 0 (or
+  pick **Off**) to stop.
+
+Size, Motion, and the FX knobs persist across restarts and re-apply to the
+current drawing the moment you change them.
