@@ -11,6 +11,14 @@ DOMAIN = "lightelf_laser"
 LOGGER = logging.getLogger(__package__)
 
 DEFAULT_NAME = "LightElf Laser"
+# The projector reports NO vendor or model name over BLE - only a numeric
+# device_type/version. "LightElf" is the firmware/app PROTOCOL FAMILY the device
+# verifiably speaks (the challenge handshake succeeds and it advertises as a
+# TD5322A module); it is not a confirmed OEM, and the retail model is not
+# knowable from either the device or the vendor APK. So we do not assert a retail
+# model - the Model field carries the device-reported hardware class instead
+# (coordinator.hardware_class, e.g. "Type 0 - v2").
+MANUFACTURER = "LightElf"
 DEFAULT_ADDRESS = ""
 DEFAULT_TIMEOUT = 10
 UPDATE_INTERVAL = timedelta(seconds=30)
@@ -42,6 +50,8 @@ PLATFORMS: tuple[Platform, ...] = (
     Platform.TEXT,
     Platform.IMAGE,
     Platform.BUTTON,
+    Platform.SENSOR,
+    Platform.BINARY_SENSOR,
 )
 
 # Device beam-color indices (high nibble of the F0/F4 point control byte and the

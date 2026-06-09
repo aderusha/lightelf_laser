@@ -70,7 +70,13 @@ from .const import (
 from .errors import LightElfLaserError
 from .hershey import list_fonts, render_text_segments
 from .preview import colorize_text_segments, render_segments_png
-from .protocol import draw_points_command, mode_command, segments_to_points
+from .protocol import (
+    DeviceFeatures,
+    draw_points_command,
+    mode_command,
+    resolve_device_features,
+    segments_to_points,
+)
 from .scroll_text import build_scroll_a0
 from .svg import read_svg, svg_draw_command, transform_segments
 
@@ -240,6 +246,15 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # DMX-512 start address (base channel), read back from query.
         self.dmx_address = DMX_ADDRESS_MIN
 
+        # Device identity learned from the query reply. Sticky: kept across
+        # disconnects so the diagnostic sensors keep showing the last-known
+        # values instead of going Unknown every time the radio is released.
+        self.device_type: int | None = None
+        self.protocol_version: int | None = None
+        self.ota_version: int | None = None
+        self.device_number: int | None = None
+        self.user_number: int | None = None
+
         super().__init__(
             hass,
             LOGGER,
@@ -252,6 +267,45 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def device_id(self) -> str:
         """Stable device identifier."""
         return self.client.device_id
+
+    @property
+    def bt_mac(self) -> str:
+        """The projector's Bluetooth MAC address (its BLE identity)."""
+        return str(self.config_entry.data.get(CONF_ADDRESS, "")).upper()
+
+    @property
+    def device_features(self) -> DeviceFeatures | None:
+        """Resolved capability set, or None until identity has been read."""
+        if self.device_type is None or self.protocol_version is None:
+            return None
+        return resolve_device_features(self.device_type, self.protocol_version)
+
+    @property
+    def firmware_version(self) -> str | None:
+        """Human-readable firmware version. ``None`` until a query is read.
+
+        Only the protocol version is reliable. The "OTA" field (query-reply bytes
+        [10:14]) overlaps the ``B0B1B2B3`` power-block frame marker and reads back
+        as a placeholder (``0xb1b2``) on device_type-0 firmware, so it is not a
+        trustworthy build number and is deliberately kept out of the headline
+        version. The raw value is still exposed via the disabled "OTA version"
+        diagnostic sensor for anyone investigating a device that does populate it.
+        """
+        if self.protocol_version is None:
+            return None
+        return f"v{self.protocol_version}"
+
+    @property
+    def hardware_class(self) -> str | None:
+        """Device-reported hardware class, e.g. "Type 0 · v2".
+
+        This is the projector's self-reported device_type + protocol version, NOT
+        a retail model name - the device and the vendor app expose no model or
+        vendor string, only these numbers. ``None`` until a query has been read.
+        """
+        if self.device_type is None or self.protocol_version is None:
+            return None
+        return f"Type {self.device_type} · v{self.protocol_version}"
 
     # -- SVG folder ---------------------------------------------------------
 
@@ -689,6 +743,16 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         data = response.get("data") or {}
         device_on = bool(data.get("device_on", self.is_on))
+        # Latch device identity from the query reply (sticky last-known).
+        for attr, key in (
+            ("device_type", "device_type"),
+            ("protocol_version", "version"),
+            ("ota_version", "ota_version"),
+            ("device_number", "device_number"),
+            ("user_number", "user_number"),
+        ):
+            if data.get(key) is not None:
+                setattr(self, attr, int(data[key]))
         if data.get("settings_xy") is not None:
             self.mount_xy = int(data["settings_xy"])
         if data.get("settings_dmx_address") is not None:
