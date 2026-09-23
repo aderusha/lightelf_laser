@@ -1,8 +1,8 @@
 """Capability diagnostic binary sensors for the LightElf Laser integration.
 
 Each sensor reports whether the connected projector supports one firmware
-capability, computed from its reported device_type + version via the same gate
-the vendor app uses (:func:`.protocol.resolve_device_features`). They are all
+capability, inferred from its reported hardware type and protocol version. These flags do
+not imply integration support or successful testing on that model. They are all
 diagnostic and disabled by default - turn on the ones you care about to see what
 this specific box can do. ``Unknown`` until the first successful query.
 """
@@ -38,7 +38,7 @@ class LightElfCapabilityDescription(BinarySensorEntityDescription):
 CAPABILITIES: tuple[LightElfCapabilityDescription, ...] = (
     LightElfCapabilityDescription(
         key="cap_custom_animation",
-        name="Custom animation upload",
+        name="Firmware custom animation support",
         icon="mdi:movie-open-play",
         feature_fn=lambda f: f.pics_play,
     ),
@@ -47,18 +47,6 @@ CAPABILITIES: tuple[LightElfCapabilityDescription, ...] = (
         name="New command protocol",
         icon="mdi:protocol",
         feature_fn=lambda f: f.cmd_new_type,
-    ),
-    LightElfCapabilityDescription(
-        key="cap_ilda",
-        name="ILDA mode",
-        icon="mdi:laser-pointer",
-        feature_fn=lambda f: f.ilda,
-    ),
-    LightElfCapabilityDescription(
-        key="cap_ilda2",
-        name="ILDA v2 mode",
-        icon="mdi:laser-pointer",
-        feature_fn=lambda f: f.ilda2,
     ),
     LightElfCapabilityDescription(
         key="cap_arbitrary_playback",

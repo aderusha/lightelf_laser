@@ -17,6 +17,8 @@ Control projector power, SVGs, text, built-in shapes, and firmware-native animat
 ## Features
 
 - **Local BLE control** with live device-state polling.
+- **Downloadable diagnostics** to help troubleshoot hardware variants.
+- **Show program selection** for the projector's onboard playback categories.
 - **SVG drawing** with a native Home Assistant upload flow.
 - **Vector text** with bundled Hershey fonts, solid colors, or rainbow strokes.
 - **Firmware scrolling text** without host-side frame streaming.
@@ -45,6 +47,11 @@ Copy `custom_components/lightelf_laser` into your Home Assistant
 `custom_components` directory, restart Home Assistant, then add **LightElf Laser** from **Settings > Devices & services**.
 
 ## Setup Notes
+
+Hardware variants can use different command formats and animation catalogs.
+Drawing and scrolling text are validated on the reference Type 0 / protocol v2
+device. Newer variants may connect and accept power/settings while rejecting
+drawings. See [Troubleshooting](docs/TROUBLESHOOTING.md) to share diagnostics.
 
 The projector supports one BLE connection at a time. If setup cannot find the device, disconnect any other BLE controller (such as the mobile app) and try again. Once configured, the **BLE connection** switch controls whether Home Assistant holds the connection or releases it.  Turn that switch off to re-enable mobile app connections.
 

@@ -43,6 +43,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         entry_id = call.data.get("entry_id")
         if entry_id:
             entries = [entry for entry in entries if entry.entry_id == entry_id]
+        if len(entries) > 1:
+            raise HomeAssistantError("Specify entry_id when multiple projectors are configured")
         if not entries:
             raise HomeAssistantError("No LightElf Laser config entry is loaded")
         entry = entries[0]
@@ -180,6 +182,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     async def _query_device(call: ServiceCall) -> dict[str, Any]:
         coordinator = _entry_from_call(call).runtime_data
+        if not coordinator.connection_enabled:
+            raise HomeAssistantError("Enable the BLE connection before querying the projector")
         try:
             result = await coordinator.client.request("query")
         except LightElfLaserError as err:
@@ -193,6 +197,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         schema=vol.Schema({vol.Optional("entry_id"): str}),
         supports_response=SupportsResponse.ONLY,
     )
+
     return True
 
 

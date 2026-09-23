@@ -18,7 +18,7 @@ body:
     id: integration_version
     attributes:
       label: Integration version
-      placeholder: "0.1.0"
+      placeholder: "0.3.0"
     validations:
       required: true
   - type: input
@@ -45,6 +45,13 @@ body:
         3. Press Display selected SVG
     validations:
       required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic report and Bluetooth connection
+      description: Download diagnostics from Settings > Devices & services > LightElf Laser and attach the JSON file here. Include your Bluetooth adapter or ESPHome proxy model. Review the file before sharing.
+    validations:
+      required: false
   - type: textarea
     id: logs
     attributes:

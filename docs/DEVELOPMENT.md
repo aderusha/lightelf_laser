@@ -27,6 +27,17 @@ Important modules:
 
 ## Local Checks
 
+Run the offline regression tests from the repository root (Python 3.13+ and
+Pillow required):
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+They exercise production protocol, transport, diagnostics, and coordinator code
+with simulated framework and Bluetooth boundaries. They do not replace testing
+the integration in Home Assistant or validating projection on real hardware.
+
 Run a syntax check from the repository root:
 
 ```powershell

@@ -11,13 +11,8 @@ DOMAIN = "lightelf_laser"
 LOGGER = logging.getLogger(__package__)
 
 DEFAULT_NAME = "LightElf Laser"
-# The projector reports NO vendor or model name over BLE - only a numeric
-# device_type/version. "LightElf" is the firmware/app PROTOCOL FAMILY the device
-# verifiably speaks (the challenge handshake succeeds and it advertises as a
-# TD5322A module); it is not a confirmed OEM, and the retail model is not
-# knowable from either the device or the vendor APK. So we do not assert a retail
-# model - the Model field carries the device-reported hardware class instead
-# (coordinator.hardware_class, e.g. "Type 0 - v2").
+# BLE identity reports a numeric hardware class, not a retail model or OEM.
+# LightElf identifies the protocol family.
 MANUFACTURER = "LightElf"
 DEFAULT_ADDRESS = ""
 DEFAULT_TIMEOUT = 10
@@ -52,6 +47,23 @@ PLATFORMS: tuple[Platform, ...] = (
     Platform.BUTTON,
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
+)
+
+# The device's onboard SHOW menu (back-panel up/down + 7-seg display) is the
+# firmware curMode, offset by one: SHOW N == curMode N+1. Selecting a program
+# sends a plain C0 mode command, so the projector plays that category from its
+# own stored per-mode content - the same thing the panel buttons do. The query
+# reply's mode byte reads the active program back. Labels follow the EY003-L
+# manual's SHOW 0-7 descriptions.
+SHOW_PROGRAMS: tuple[tuple[str, int], ...] = (
+    ("Random (all)", 1),
+    ("Line shapes", 2),
+    ("Animations", 3),
+    ("Saved text", 4),
+    ("Christmas", 5),
+    ("Outdoor", 6),
+    ("Programming", 7),
+    ("Hand-drawn (last draw)", 8),
 )
 
 # Device beam-color indices (high nibble of the F0/F4 point control byte and the

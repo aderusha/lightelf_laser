@@ -14,6 +14,7 @@ from .const import (
     MOUNT_ORIENTATION_OPTIONS,
     NATIVE_ANIMATION_FAMILIES,
     SHAPE_COLOR_OPTIONS,
+    SHOW_PROGRAMS,
     SVG_COLOR_OPTIONS,
     TEXT_COLOR_OPTIONS,
     TEXT_MODES,
@@ -22,6 +23,10 @@ from .coordinator import LightElfLaserConfigEntry
 from .entity import LightElfLaserEntity
 
 _NONE = "(no SVG files found)"
+
+_SHOW_LABELS = [label for label, _ in SHOW_PROGRAMS]
+_SHOW_LABEL_TO_MODE = {label: curmode for label, curmode in SHOW_PROGRAMS}
+_SHOW_MODE_TO_LABEL = {curmode: label for label, curmode in SHOW_PROGRAMS}
 
 
 async def async_setup_entry(
@@ -44,6 +49,7 @@ async def async_setup_entry(
             LightElfTextModeSelect(coordinator),
             LightElfMotionSelect(coordinator),
             LightElfMountOrientationSelect(coordinator),
+            LightElfShowProgramSelect(coordinator),
         ]
     )
 
@@ -345,3 +351,32 @@ class LightElfMountOrientationSelect(LightElfLaserEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         """Set the projector-global mount orientation."""
         await self.coordinator.async_set_mount_xy(MOUNT_ORIENTATION_OPTIONS[option])
+
+
+class LightElfShowProgramSelect(LightElfLaserEntity, SelectEntity):
+    """Switch the projector's onboard SHOW program (mirrors the panel menu).
+
+    The back-panel up/down + 7-seg SHOW 0-7 menu is the firmware curMode (1-8).
+    Picking a program sends a C0 mode command, so the projector plays that
+    category from its own stored content - the same thing the buttons do. The
+    active program is read back from the device query, so turning the panel knob
+    updates this too. Shows blank when the device is in a non-SHOW mode (DMX,
+    other playback modes).
+    """
+
+    _attr_name = "Show program"
+    _attr_icon = "mdi:playlist-play"
+    _attr_options = _SHOW_LABELS
+
+    def __init__(self, coordinator) -> None:
+        """Initialize the show-program selector."""
+        super().__init__(coordinator, "show_program")
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the active SHOW program label, or None if outside the menu."""
+        return _SHOW_MODE_TO_LABEL.get(self.coordinator.current_show_program)
+
+    async def async_select_option(self, option: str) -> None:
+        """Switch the device to the chosen SHOW program."""
+        await self.coordinator.async_set_show_program(_SHOW_LABEL_TO_MODE[option])

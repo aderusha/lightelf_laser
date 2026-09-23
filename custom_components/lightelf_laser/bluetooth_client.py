@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import random
+from collections import deque
+from copy import deepcopy
 from dataclasses import replace
+from datetime import datetime, timezone
+from time import monotonic
 from typing import Any
 
 from bleak_retry_connector import (
@@ -35,6 +39,7 @@ from .protocol import (
     power_command,
     query_command,
     reply_complete,
+    resolve_device_features,
     send_script_to_chunks,
     settings_command,
 )
@@ -45,6 +50,13 @@ class LightElfBluetoothError(LightElfLaserError):
 
 
 _RETRY_EXCEPTIONS = (*BLEAK_RETRY_EXCEPTIONS, LightElfBluetoothError)
+WRITE_CHUNK_SIZE = 20
+WRITE_DELAY_SECONDS = 0.03
+_COMMAND_NAMES = {
+    "E0E1E2E3": "query", "B0B1B2B3": "power", "C0C1C2C3": "mode",
+    "00010203": "settings", "F0F1F2F3": "draw", "A0A1A2A3": "text",
+    "70717073": "point_play", "D0D1D2D3": "effect",
+}
 
 NATIVE_BUILTIN_FAMILIES = {
     "line": {"mode": 2, "project": 2, "max": 50},
@@ -160,12 +172,38 @@ class LightElfBluetoothClient:
         self._loop_task: asyncio.Task[None] | None = None
         self._device_on = False
         self._device_type = 0
+        self._features = None
+        self._last_query: dict[str, Any] | None = None
+        self._history: deque[dict[str, Any]] = deque(maxlen=32)
+        self._write_properties: list[str] = []
+        self._last_profile: dict[str, str] | None = None
         self._settings_state: SettingsState | None = None
         self._mode_state: ModeState | None = None
-        # Prefer acknowledged writes when the write characteristic supports them.
-        # Write-without-response can silently drop chunks through a BT proxy,
-        # corrupting the tail of larger draw streams (e.g. the last glyph).
+        # Pace unacknowledged writes for reliable delivery through proxies.
         self._write_response = False
+
+    @property
+    def write_chunk_size(self) -> int:
+        return WRITE_CHUNK_SIZE
+
+    @property
+    def write_delay_ms(self) -> int:
+        return 1 if self._write_response else round(WRITE_DELAY_SECONDS * 1000)
+
+    def diagnostic_snapshot(self) -> dict[str, Any]:
+        """Return cached metadata only; never connect or expose payload content."""
+        return deepcopy({
+            "connected": bool(self._client and self._client.is_connected),
+            "can_send": self._can_send,
+            "profile": self._last_profile,
+            "write_properties": self._write_properties,
+            "write_with_response": self._write_response,
+            "write_chunk_size": self.write_chunk_size,
+            "write_delay_ms": self.write_delay_ms,
+            "last_query": self._last_query,
+            "last_reported_mode": self._mode_state_data(),
+            "recent_operations": list(self._history),
+        })
 
     @property
     def device_id(self) -> str:
@@ -207,6 +245,10 @@ class LightElfBluetoothClient:
         # writes (fast enough that the whole frame lands inside the device's
         # frame-assembly window) and pace them to keep the proxy from reordering.
         self._write_response = False
+        self._write_properties = [p for p in props if p in {
+            "read", "write", "write-without-response", "notify", "indicate"
+        }]
+        self._last_profile = dict(self._profile)
         LOGGER.debug("LightElf write char properties=%s (using unacked writes)", props)
 
     async def _disconnect_locked(self) -> None:
@@ -238,20 +280,36 @@ class LightElfBluetoothClient:
     async def _write_script_locked(self, script: str) -> None:
         if self._client is None or self._profile is None:
             raise LightElfBluetoothError("Bluetooth client is not connected")
-        clean_hex(script)
-        for chunk in send_script_to_chunks(script):
-            if chunk == "split":
-                await asyncio.sleep(0.1)
-                continue
-            if chunk == "reply":
-                raise LightElfBluetoothError("Reply marker is not supported in send scripts")
-            await self._client.write_gatt_char(
-                self._profile["write"], chunk, response=self._write_response
-            )
-            # Acked writes self-pace; unacked writes need spacing so the BT proxy
-            # delivers them in order (it has no ATT ordering guarantee). 30 ms is
-            # comfortably below the device's frame-assembly window.
-            await asyncio.sleep(0.001 if self._write_response else 0.03)
+        cleaned = clean_hex(script)
+        chunks = send_script_to_chunks(script, chunk_size=self.write_chunk_size)
+        event = {
+            "time": datetime.now(timezone.utc).isoformat(),
+            "operation": _COMMAND_NAMES.get(cleaned[:8], "other"),
+            "bytes": sum(len(chunk) for chunk in chunks if isinstance(chunk, bytes)),
+            "chunks_written": 0,
+            "result": "cancelled",
+        }
+        started = monotonic()
+        try:
+            for chunk in chunks:
+                if chunk == "split":
+                    await asyncio.sleep(0.1)
+                    continue
+                if chunk == "reply":
+                    raise LightElfBluetoothError("Reply marker is not supported in send scripts")
+                await self._client.write_gatt_char(
+                    self._profile["write"], chunk, response=self._write_response
+                )
+                event["chunks_written"] += 1
+                await asyncio.sleep(self.write_delay_ms / 1000)
+            event["result"] = "written"
+        except Exception as err:
+            event["result"] = "failed"
+            event["error_type"] = type(err).__name__
+            raise
+        finally:
+            event["duration_ms"] = round((monotonic() - started) * 1000)
+            self._history.append(event)
 
     async def _query_locked(self) -> Any:
         random_bytes = [random.randrange(256) for _ in range(4)]
@@ -271,8 +329,17 @@ class LightElfBluetoothClient:
                     self._reply_event.clear()
             raw = b"".join(self._reply_chunks).hex().upper()
             parsed = parse_query_reply(raw, random_bytes)
+            if not parsed.challenge_ok:
+                raise LightElfBluetoothError("LightElf query challenge failed")
             self._remember_query_state(parsed)
             return parsed
+        except Exception as err:
+            self._history.append({
+                "time": datetime.now(timezone.utc).isoformat(),
+                "operation": "query_reply", "result": "failed",
+                "error_type": type(err).__name__,
+            })
+            raise
         finally:
             self._reply_chunks = None
             self._reply_event = None
@@ -281,15 +348,33 @@ class LightElfBluetoothClient:
         """Cache query-derived state needed to preserve settings writes."""
         self._device_on = bool(parsed.device_on)
         self._device_type = int(parsed.device_type)
+        self._features = resolve_device_features(parsed.device_type, parsed.version)
+        self._last_query = {
+            "time": datetime.now(timezone.utc).isoformat(),
+            "reply_bytes": len(parsed.raw_hex) // 2,
+            "challenge_ok": parsed.challenge_ok,
+            "device_on": parsed.device_on,
+            "device_type": parsed.device_type,
+            "protocol_version": parsed.version,
+            "device_number": parsed.device_number,
+            "user_number": parsed.user_number,
+            "ota_version_raw": parsed.ota_version,
+        }
         try:
             state = parse_device_state(
                 parsed.raw_hex,
                 query=parsed,
-                cmd_new_type=bool(parsed.device_type == 1),
+                cmd_new_type=self._features.cmd_new_type,
+                xy_cnf=self._features.xy_cnf,
             )
         except Exception as err:
+            self._last_query["state_parse_error_type"] = type(err).__name__
             LOGGER.debug("Could not parse full LightElf query state: %s", err)
             return
+        self._last_query["parsed_blocks"] = {
+            name: getattr(state, name) is not None
+            for name in ("power", "mode", "settings", "xy_config", "pis", "draw")
+        }
         if state.settings is not None:
             self._settings_state = state.settings
         if state.mode is not None:
@@ -419,7 +504,7 @@ class LightElfBluetoothClient:
                 "grating": current.grating if current else 5,
                 "password_status": current.password_status if current else 255,
                 "password": current.password if current else 6688,
-                "cmd_new_type": bool(self._device_type == 1),
+                "cmd_new_type": bool(self._features and self._features.cmd_new_type),
             }
             await self._write_script_locked(settings_command(**kwargs))
             if current is not None:

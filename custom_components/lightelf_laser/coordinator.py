@@ -220,6 +220,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             entry.options.get("sound_sensitivity", DEFAULT_SOUND_SENSITIVITY)
         )
         self._native_animation_active = False
+        self._active_show_program: int | None = None
 
         # Live effect transforms applied to our own draws (SVG/shape/text). A
         # motion preset selects which cnf fields are active and their (slow,fast)
@@ -300,12 +301,26 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Device-reported hardware class, e.g. "Type 0 · v2".
 
         This is the projector's self-reported device_type + protocol version, NOT
-        a retail model name - the device and the vendor app expose no model or
-        vendor string, only these numbers. ``None`` until a query has been read.
+        a retail model name - the BLE reply exposes no retail model or
+        manufacturer string, only these numbers. ``None`` until a query has been read.
         """
         if self.device_type is None or self.protocol_version is None:
             return None
         return f"Type {self.device_type} · v{self.protocol_version}"
+
+    @property
+    def current_show_program(self) -> int | None:
+        """The device's active SHOW program as a curMode (1-8), or None.
+
+        Read from the query reply's mode byte, so it tracks the physical
+        back-panel SHOW menu as well as HA-issued switches. ``None`` when the
+        device is in a mode outside the SHOW menu (DMX or other playback modes).
+        """
+        data = self.data or {}
+        mode = (data.get("mode_state") or {}).get("mode")
+        if isinstance(mode, int) and 1 <= mode <= 8:
+            return mode
+        return None
 
     # -- SVG folder ---------------------------------------------------------
 
@@ -643,8 +658,48 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self.is_on = True
         self._native_animation_active = True
+        self._active_show_program = None
         self._last_draw = None
         await self.async_request_refresh()
+
+    async def async_set_show_program(self, curmode: int) -> None:
+        """Switch the onboard SHOW program (mirrors the back-panel SHOW menu).
+
+        SHOW N on the device is curMode N+1. Sends a plain C0 mode command so the
+        projector plays that program category from its own stored per-mode
+        content - exactly what the up/down buttons do. Sound-reactive state is
+        carried along for the modes that support voice control.
+        """
+        if curmode not in range(1, 9):
+            raise LightElfLaserError("Show program must be between 1 and 8")
+        command = mode_command(
+            mode=curmode,
+            color=9,
+            size_percent=100,
+            speed_percent=50,
+            distance_percent=50,
+            playback="sound" if self.sound_reactive else "auto",
+            sound_percent=self.sound_sensitivity,
+        )
+        await self.client.request("power", {"on": True})
+        await self.client.request("raw", {"hex": command})
+        self.is_on = True
+        # Per the manual, voice control applies to SHOW 0/1/2/4/5 = curMode
+        # 1/2/3/5/6; treat those as an active firmware effect so a sound toggle
+        # re-applies. Text/Programming/Graffiti don't react to sound.
+        self._native_animation_active = curmode in (1, 2, 3, 5, 6)
+        self._active_show_program = curmode
+        self._last_draw = None
+        # Optimistically reflect the new program so the select flips immediately.
+        # We deliberately do NOT force a refresh here: the device's own mode
+        # read-back lags the command by a beat, so an immediate re-query returns
+        # the *previous* mode and would clobber this. The next scheduled poll
+        # reconciles (and still picks up panel-knob changes within a cycle).
+        data = dict(self.data or {})
+        mode_state = dict(data.get("mode_state") or {})
+        mode_state["mode"] = curmode
+        data["mode_state"] = mode_state
+        self.async_set_updated_data(data)
 
     async def async_display_shape(self) -> None:
         """Draw the selected built-in shape as a static frame (powers on)."""
@@ -665,6 +720,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
+        self._active_show_program = None
         self._last_draw = self.async_display_shape
         await self.async_request_refresh()
 
@@ -758,6 +814,13 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if data.get("settings_dmx_address") is not None:
             self.dmx_address = int(data["settings_dmx_address"])
         mode_state = data.get("mode_state")
+        if self._active_show_program is not None and mode_state is not None:
+            reported_mode = mode_state.get("mode")
+            self._active_show_program = (
+                reported_mode if isinstance(reported_mode, int) and 1 <= reported_mode <= 8
+                else None
+            )
+            self._native_animation_active = reported_mode in (1, 2, 3, 5, 6)
         self.is_on = device_on
         return {
             "connection_enabled": True,
@@ -820,7 +883,10 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _reapply_sound_if_playing(self) -> None:
         """Re-issue the current firmware animation so sound settings take effect."""
         if self.is_on and self._native_animation_active and self.connection_enabled:
-            await self.async_display_native_animation()
+            if self._active_show_program is not None:
+                await self.async_set_show_program(self._active_show_program)
+            else:
+                await self.async_display_native_animation()
 
     def _scale_band(self, band: tuple[int, int]) -> int:
         """Map the motion speed (1-100) into a (slow, fast) band."""
@@ -924,6 +990,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # stop native animations and update the real device_on byte.
             await self.client.request("raw", {"hex": "B0B1B2B300B4B5B6B7"})
             self._native_animation_active = False
+            self._active_show_program = None
             self._last_draw = None
         self.is_on = on
         self.async_set_updated_data(
@@ -955,6 +1022,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
+        self._active_show_program = None
         self._last_draw = self.async_display_svg
         await self.async_request_refresh()
 
@@ -1005,6 +1073,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
+        self._active_show_program = None
         self._last_draw = self.async_display_text
         await self.async_request_refresh()
 
@@ -1076,5 +1145,6 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("raw", {"hex": c0})
         self.is_on = True
         self._native_animation_active = False
+        self._active_show_program = None
         self._last_draw = None
         await self.async_request_refresh()

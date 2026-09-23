@@ -148,13 +148,9 @@ class DeviceState:
 class DeviceFeatures:
     """Capabilities a LightElf-family projector exposes for a given identity.
 
-    This is a faithful port of the vendor app's ``getDeviceFeatures()`` gate
-    (``app-service`` 2.0.0, App.vue ~L322). Every flag is *derived* from the
-    reported ``device_type`` (n) and ``version`` (a) - it is what the firmware
-    family supports for that type/version pair, not something separately probed.
-    Different vendors in this white-label stack (LightElf, Algam, STEELPRO /
-    RayFlow) ship different type/version pairs, so the same resolver describes
-    whatever box is actually connected.
+    Flags are inferred from the reported hardware type and protocol version.
+    They describe firmware capabilities, not features verified or implemented
+    by this integration on every projector. They are not separately probed.
     """
 
     device_type: int
@@ -169,22 +165,17 @@ class DeviceFeatures:
     # Playback capability
     arb_play: bool             # arbitrary/playlist device-side playback
     pics_play: bool            # upload custom frame playlist for device-side play
-    ilda: bool                 # ILDA streaming mode
-    ilda2: bool                # ILDA v2 mode
     ttl_animation: bool
     animation_fix: bool        # legacy device_type-1 animation index remap
-    cmd_new_type: bool         # new command family (unlocks pics/new prjs/fast MTU)
+    cmd_new_type: bool         # new command family
     new_projects: bool         # extra project modes (Aurora/Love)
-    # BLE streaming tuning the app uses for this device
-    ble_mtu: int
-    write_delay_ms: int
+    project_items_64: bool     # firmware exposes 64 rather than 50 selections
 
 
 def resolve_device_features(device_type: int, version: int) -> DeviceFeatures:
     """Compute the capability flags for a reported device_type + version.
 
-    Mirrors the vendor app gate exactly so a HA diagnostic surface can show what
-    the connected projector can do. See :class:`DeviceFeatures`.
+    These are inferred firmware flags; see :class:`DeviceFeatures`.
     """
     n = int(device_type)
     a = int(version)
@@ -193,32 +184,20 @@ def resolve_device_features(device_type: int, version: int) -> DeviceFeatures:
     show_outdoor = (n == 1 and a >= 2) or n > 1
     xy_cnf = n == 2
 
-    if n in (1, 2):
-        ilda, ilda2 = True, True
-    elif n == 3:
-        ilda, ilda2 = False, True
-    else:
-        ilda, ilda2 = False, False
-
     ttl = n in (1, 2)
     arb = n >= 2 or a >= 3
     text_up_down = n >= 3 or a >= 4
-    cmd_new = n >= 3 or a >= 30
+    cmd_new = n >= 3 or a >= 0x30
     animation_fix = n == 1
 
     pics_play = False
     new_projects = False
     if cmd_new:
-        # The new command family forces the advanced feature set on and bumps
-        # the streaming budget (bigger MTU, no inter-chunk delay).
+        # New command firmware also enables the extended playback flags.
         pics_play = True
         new_projects = True
-        ilda2 = True
         arb = True
         text_up_down = True
-        ble_mtu, write_delay = 180, 0
-    else:
-        ble_mtu, write_delay = 20, 10
 
     return DeviceFeatures(
         device_type=n,
@@ -231,14 +210,11 @@ def resolve_device_features(device_type: int, version: int) -> DeviceFeatures:
         xy_cnf=xy_cnf,
         arb_play=arb,
         pics_play=pics_play,
-        ilda=ilda,
-        ilda2=ilda2,
         ttl_animation=ttl,
         animation_fix=animation_fix,
         cmd_new_type=cmd_new,
         new_projects=new_projects,
-        ble_mtu=ble_mtu,
-        write_delay_ms=write_delay,
+        project_items_64=cmd_new and (n > 3 or a >= 0x31),
     )
 
 

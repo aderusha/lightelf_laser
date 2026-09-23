@@ -38,13 +38,11 @@ def _ota_hex(coordinator: LightElfLaserDataUpdateCoordinator) -> str | None:
 
 
 def _mtu(coordinator: LightElfLaserDataUpdateCoordinator) -> int | None:
-    features = coordinator.device_features
-    return features.ble_mtu if features else None
+    return coordinator.client.write_chunk_size
 
 
 def _write_delay(coordinator: LightElfLaserDataUpdateCoordinator) -> int | None:
-    features = coordinator.device_features
-    return features.write_delay_ms if features else None
+    return coordinator.client.write_delay_ms
 
 
 SENSORS: tuple[LightElfSensorDescription, ...] = (

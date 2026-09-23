@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0
+
+- Add downloadable diagnostics with device identity, inferred firmware
+  capabilities, actual Bluetooth write settings, and a bounded history of
+  command sizes, timings, and outcomes. Exclude user content and raw packets.
+- Show the reported hardware class instead of a fixed retail model, and add
+  identity and optional firmware-capability sensors.
+- Correct protocol-generation detection and settings-format selection.
+- Add an onboard Show program selector. Sound adjustments preserve the selected
+  program, including changes read back from the projector's controls.
+- Report actual Bluetooth chunk size and delay in diagnostic sensors.
+- Require a target when actions could address multiple projectors, and respect
+  the released BLE connection when requesting device state.
+
+Drawing and scrolling text still use the legacy format. Newer hardware and
+64-pattern catalogs are not yet validated; diagnostics make these differences
+visible without claiming full compatibility. Animation previews are captures
+from the reference device and may differ on other firmware.
+
 ## 0.2.0
 
 - Add **sound-reactive ("Music") mode**: a `Sound reactive` switch and a
