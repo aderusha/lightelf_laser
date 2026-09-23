@@ -167,7 +167,7 @@ def build_a0(groups, feats, ver=0, solid_color=None):
     total_chars = sum(g["charCount"] for g in built)
     s = "".join(g["cmd"] for g in built)
     k = _x(len(built), 2)
-    l = "".join(_x(g["charCount"], 2) for g in built)
+    character_counts = "".join(_x(g["charCount"], 2) for g in built)
     p = "".join(g["charWidthCmd"] for g in built)
     d = "".join(g["charPointCmd"] for g in built)
     g1 = "".join(g["se1"] for g in built)
@@ -175,7 +175,7 @@ def build_a0(groups, feats, ver=0, solid_color=None):
     m = "".join(g["ver"] for g in built)
     j = "".join(g["time"] for g in built)
     return (
-        "A0A1A2A3" + _x(total_pts) + _x(total_chars, 2) + s + k + l + p + d + g1 + g2 + m + j + "A4A5A6A7"
+        "A0A1A2A3" + _x(total_pts) + _x(total_chars, 2) + s + k + character_counts + p + d + g1 + g2 + m + j + "A4A5A6A7"
     ).upper()
 
 
@@ -210,11 +210,25 @@ def text_to_xys(text, font_name, unit):
     return xys
 
 
-def build_scroll_a0(text, font_name, unit, time_val=5, solid_color=None):
+def build_scroll_a0(
+    text,
+    font_name,
+    unit,
+    time_val=5,
+    solid_color=None,
+    *,
+    text_stop_time=True,
+    cmd_new_type=False,
+    text_decimal_time=False,
+):
     """Top-level: build the A0 text command for `text`.
 
     solid_color None -> rainbow (cycle per stroke); otherwise a single color index.
     """
-    feats = {"textStopTime": True, "cmdNewType": False, "textDecimalTime": False}
+    feats = {
+        "textStopTime": text_stop_time,
+        "cmdNewType": cmd_new_type,
+        "textDecimalTime": text_decimal_time,
+    }
     xys = text_to_xys(text, font_name, unit)
     return build_a0([{"xys": xys, "time": time_val}], feats, ver=0, solid_color=solid_color)

@@ -57,6 +57,14 @@ BUTTONS = (
         needs_connection=False,
         action=lambda coordinator: coordinator.async_rescan_svgs(),
     ),
+    LightElfButtonDescription(
+        key="run_compatibility_scan",
+        name="Run compatibility scan",
+        icon="mdi:flask-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        needs_connection=False,
+        action=lambda coordinator: coordinator.async_start_discovery_scan(),
+    ),
 )
 
 
@@ -82,6 +90,8 @@ class LightElfButton(LightElfLaserEntity, ButtonEntity):
     @property
     def available(self) -> bool:
         """Connection-free buttons stay usable; others need a live link."""
+        if self.entity_description.key == "run_compatibility_scan" and self.coordinator.discovery_status == "running":
+            return False
         if not self.entity_description.needs_connection:
             return True
         return super().available

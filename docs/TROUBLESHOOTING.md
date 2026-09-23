@@ -1,5 +1,36 @@
 # Troubleshooting
 
+## One-Button Compatibility Scan
+
+If power or animations work but drawing or text does not, use the **Run
+compatibility scan** diagnostic button on the LightElf Laser device. Aim the
+laser at a safe projection surface first. The scan replaces the current
+projection with fixed, short test images and text, checks several protocol
+formats and mode-change orders, and turns the output off at the end. It does
+not alter DMX settings, mount orientation, or firmware. It can replace the
+projector's last hand-drawn image or saved text.
+
+The **Compatibility scan status** sensor shows `running`, `complete`, `partial`,
+or `failed`, with the current step in its attributes. Wait for it to finish,
+then download diagnostics from **Settings > Devices & services > LightElf Laser >
+three-dot menu > Download diagnostics**. The latest scan survives a Home
+Assistant restart and remains in the diagnostic download until another scan
+replaces it. If `power_off_confirmed` is false, turn the output off manually.
+
+Attach the JSON report to a compatibility issue after reviewing it. If easy,
+add a short video of the projection during the scan, or tell us which named
+visual cues appeared. The scan can read back device mode and power but cannot
+detect what the laser actually projects. Each probe in the report includes a
+timestamp and expected visual cue so a video can be matched to the command.
+The report contains fixed-command fingerprints and parsed read-backs, not your
+text or uploaded files. It also excludes raw Bluetooth replies, addresses,
+passwords, and challenge values. Home Assistant adds environment information
+to the diagnostic download; review the complete file before posting it.
+
+If the scan fails because Bluetooth disconnects, leave the mobile controller
+disconnected, turn the **BLE connection** switch on, and try once more. No
+terminal, packet capture, factory reset, or firmware update is required.
+
 ## Share A Diagnostic Report
 
 After reproducing a problem, open **Settings > Devices & services > LightElf
@@ -29,11 +60,12 @@ Review logs before sharing: they can contain addresses and filenames.
 ## Power Works But Drawings Or Animation Selection Do Not
 
 Related projector models can use different command formats and animation banks.
-Download diagnostics after trying a simple SVG, one letter in static text mode,
-and the same letter in scrolling mode. Note whether each leaves the previous
-image unchanged, produces malformed output, or works. Press the display button
-after making each selection. Aim at a safe projection surface and turn output
-off after testing.
+Run the compatibility scan above first. Its fixed samples cover simple SVG,
+static text, and scrolling text without using your content. If the scan itself
+cannot finish, try a simple SVG, one letter in static text mode, and the same
+letter in scrolling mode. Note whether each leaves the previous image unchanged,
+produces malformed output, or works. Press the display button after making each
+selection. Aim at a safe projection surface and turn output off after testing.
 
 The report separates **inferred firmware capabilities** from **integration
 behavior**. Version 0.3.0 still sends legacy drawing and scrolling-text packets;

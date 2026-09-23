@@ -46,6 +46,7 @@ def load_modules():
         "homeassistant.core": {"HomeAssistant": Generic},
         "homeassistant.config_entries": {"ConfigEntry": Generic},
         "homeassistant.helpers": {},
+        "homeassistant.helpers.storage": {"Store": Generic},
         "homeassistant.helpers.update_coordinator": {"DataUpdateCoordinator": Generic},
         "homeassistant.loader": {
             "async_get_integration": AsyncMock(return_value=SimpleNamespace(version="test"))
@@ -63,11 +64,11 @@ def load_modules():
         modules[name] = module
     with patch.dict(sys.modules, modules):
         return tuple(importlib.import_module(f"{PACKAGE}.{name}") for name in (
-            "protocol", "bluetooth_client", "diagnostics", "coordinator"
+            "protocol", "bluetooth_client", "diagnostics", "coordinator", "discovery"
         ))
 
 
-protocol, bluetooth, diagnostics, coordinator_module = load_modules()
+protocol, bluetooth, diagnostics, coordinator_module, discovery = load_modules()
 
 
 def make_client():
@@ -162,6 +163,36 @@ class DiagnosticTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(event["operation"], "draw")
         self.assertEqual(event["bytes"], len(script) // 2)
         self.assertNotIn(script, json.dumps(event))
+
+    async def test_probe_keeps_fixed_writes_and_two_queries_together(self):
+        client = make_client()
+        client._ensure_connected_locked = AsyncMock()
+        modes = iter((3, 8))
+
+        async def query():
+            mode = next(modes)
+            client._last_query = {
+                "time": "test", "device_on": True,
+                "parsed_blocks": {"mode": True},
+            }
+            client._mode_state = SimpleNamespace(
+                mode=mode, color=9, speed_percent=50, distance_percent=50,
+                playback=0, projects={},
+            )
+
+        client._query_locked = AsyncMock(side_effect=query)
+        with patch.object(bluetooth.asyncio, "sleep", new_callable=AsyncMock) as sleep:
+            result = await client.async_probe_packets([
+                ("select_draw", protocol.mode_command(mode=8)),
+            ])
+        self.assertEqual([entry["phase"] for entry in result["readbacks"]],
+                         ["early", "settled"])
+        self.assertEqual([entry["mode_state"]["mode"] for entry in result["readbacks"]],
+                         [3, 8])
+        self.assertEqual(result["writes"][0]["label"], "select_draw")
+        self.assertEqual(result["writes"][0]["result"], "written")
+        self.assertIn((0.35,), [call.args for call in sleep.call_args_list])
+        self.assertIn((1.25,), [call.args for call in sleep.call_args_list])
 
     async def test_write_failure_keeps_type_not_exception_text(self):
         client = make_client()
@@ -268,6 +299,130 @@ class DiagnosticTests(unittest.IsolatedAsyncioTestCase):
         coordinator.async_display_native_animation = AsyncMock()
         await coordinator._reapply_sound_if_playing()
         coordinator.async_display_native_animation.assert_awaited_once()
+
+    async def test_fixed_scan_plan_uses_no_user_content(self):
+        async def executor(function, *args):
+            return function(*args)
+
+        fake = SimpleNamespace(
+            hass=SimpleNamespace(async_add_executor_job=executor),
+            client=SimpleNamespace(_features=protocol.resolve_device_features(2, 2)),
+            text_message="PRIVATE MESSAGE",
+            selected_svg="private-file.svg",
+            _build_svg_command=coordinator_module.LightElfLaserDataUpdateCoordinator._build_svg_command,
+            _build_text_command=coordinator_module.LightElfLaserDataUpdateCoordinator._build_text_command,
+        )
+        probes = await discovery.build_probes(fake)
+        self.assertIn("svg_direct_from_animation", [probe.key for probe in probes])
+        self.assertIn("new_format_draw", [probe.key for probe in probes])
+        self.assertIn("scroll_inferred_encoding", [probe.key for probe in probes])
+        encoded = json.dumps([probe.packets for probe in probes])
+        self.assertNotIn("PRIVATE MESSAGE", encoded)
+        self.assertNotIn("private-file.svg", encoded)
+        self.assertLess(max(len(packet) // 2 for probe in probes for _, packet in probe.packets), 1000)
+
+    async def test_scan_records_each_step_and_final_power_off(self):
+        identity = {"device_type": 2, "protocol_version": 2, "device_on": True}
+        async def probe(packets, **kwargs):
+            if packets and packets[0][0] == "power_off_legacy":
+                on = False
+            else:
+                on = True
+            return {"writes": [], "readbacks": [{
+                "phase": "settled", "result": "ok", "device_on": on,
+                "mode_state": {"mode": 3},
+            }]}
+        fake_client = SimpleNamespace(
+            _features=protocol.resolve_device_features(2, 2),
+            discovery_active=False,
+            diagnostic_snapshot=lambda: {"last_query": identity, "recent_operations": []},
+            async_probe_packets=probe,
+        )
+        fake = SimpleNamespace(
+            client=fake_client,
+            _set_discovery_progress=unittest.mock.Mock(),
+            _save_discovery_report=AsyncMock(),
+        )
+        fixed_probes = [
+            discovery.Probe("test_one", "red line", 8, (("draw", protocol.power_command(True)),)),
+            discovery.Probe("test_two", "green line", 4, (("mode", protocol.mode_command(mode=4)),)),
+        ]
+        with patch.object(discovery, "build_probes", AsyncMock(return_value=fixed_probes)):
+            result = await discovery.run_scan(fake)
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual([step["key"] for step in result["steps"]], ["test_one", "test_two"])
+        self.assertTrue(result["power_off_confirmed"])
+        self.assertFalse(fake_client.discovery_active)
+        self.assertEqual(fake._save_discovery_report.await_count, 3)
+
+    async def test_scan_cancellation_still_sends_power_off(self):
+        calls = []
+        async def probe(packets, **kwargs):
+            calls.append([label for label, _ in packets])
+            if packets and packets[0][0] == "test":
+                raise asyncio.CancelledError()
+            return {"writes": [], "readbacks": [{
+                "phase": "settled", "result": "ok",
+                "device_on": False if packets and packets[0][0] == "power_off_legacy" else True,
+            }]}
+        fake_client = SimpleNamespace(
+            _features=None, discovery_active=False,
+            diagnostic_snapshot=lambda: {"last_query": {}, "recent_operations": []},
+            async_probe_packets=probe,
+        )
+        fake = SimpleNamespace(
+            client=fake_client,
+            _set_discovery_progress=unittest.mock.Mock(),
+            _save_discovery_report=AsyncMock(),
+        )
+        fixed_probes = [discovery.Probe("test", "test", None,
+                                        (("test", protocol.power_command(True)),))]
+        with patch.object(discovery, "build_probes", AsyncMock(return_value=fixed_probes)):
+            result = await discovery.run_scan(fake)
+        self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(calls[-1], ["power_off_legacy", "power_off_legacy_repeat"])
+        self.assertFalse(fake_client.discovery_active)
+
+    async def test_full_fixed_scan_builds_shareable_json(self):
+        async def executor(function, *args):
+            return function(*args)
+
+        async def probe(packets, **kwargs):
+            labels = [label for label, _ in packets]
+            is_off = "power_off_legacy" in labels
+            mode = 4 if any("text_mode" in label for label in labels) else 8
+            return {"writes": [{"label": label, "result": "written"} for label in labels],
+                    "readbacks": [{
+                        "phase": "settled", "result": "ok", "device_on": not is_off,
+                        "parsed_blocks": {"mode": True}, "mode_state": {"mode": mode},
+                    }]}
+
+        fake = SimpleNamespace(
+            hass=SimpleNamespace(async_add_executor_job=executor),
+            client=SimpleNamespace(
+                _features=protocol.resolve_device_features(2, 2),
+                discovery_active=False,
+                diagnostic_snapshot=lambda: {
+                    "last_query": {"device_type": 2, "protocol_version": 2},
+                    "recent_operations": [],
+                },
+                async_probe_packets=probe,
+            ),
+            text_message="PRIVATE MESSAGE",
+            selected_svg="private-file.svg",
+            _build_svg_command=coordinator_module.LightElfLaserDataUpdateCoordinator._build_svg_command,
+            _build_text_command=coordinator_module.LightElfLaserDataUpdateCoordinator._build_text_command,
+            _set_discovery_progress=unittest.mock.Mock(),
+            _save_discovery_report=AsyncMock(),
+        )
+        report = await discovery.run_scan(fake)
+        encoded = json.dumps(report)
+        self.assertEqual(report["status"], "complete")
+        self.assertGreater(len(report["steps"]), 15)
+        self.assertTrue(report["power_off_confirmed"])
+        self.assertNotIn("PRIVATE MESSAGE", encoded)
+        self.assertNotIn("private-file.svg", encoded)
+        self.assertLess(len(encoded), 200000)
 
 
 if __name__ == "__main__":

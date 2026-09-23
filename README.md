@@ -17,7 +17,8 @@ Control projector power, SVGs, text, built-in shapes, and firmware-native animat
 ## Features
 
 - **Local BLE control** with live device-state polling.
-- **Downloadable diagnostics** to help troubleshoot hardware variants.
+- **Downloadable diagnostics** and an opt-in compatibility scan to help
+  troubleshoot hardware variants.
 - **Show program selection** for the projector's onboard playback categories.
 - **SVG drawing** with a native Home Assistant upload flow.
 - **Vector text** with bundled Hershey fonts, solid colors, or rainbow strokes.

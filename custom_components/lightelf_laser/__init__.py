@@ -13,7 +13,6 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
-    COLOR_OPTIONS,
     DOMAIN,
     PLATFORMS,
     SHAPE_COLOR_OPTIONS,
@@ -204,6 +203,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 async def async_setup_entry(hass: HomeAssistant, entry: LightElfLaserConfigEntry) -> bool:
     """Set up LightElf Laser from a config entry."""
     coordinator = LightElfLaserDataUpdateCoordinator(hass, entry)
+    await coordinator.async_load_discovery_report()
     await coordinator.async_load_fonts()
     await coordinator.async_load_builtin()
     await coordinator.async_load_native_animations()
@@ -215,4 +215,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: LightElfLaserConfigEntry
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry[Any]) -> bool:
     """Unload a config entry."""
+    if entry.runtime_data is not None:
+        await entry.runtime_data.async_stop_discovery_scan()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

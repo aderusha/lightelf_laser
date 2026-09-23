@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -13,6 +15,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.storage import Store
 
 from .bluetooth_client import LightElfBluetoothClient
 from .const import (
@@ -68,6 +71,7 @@ from .const import (
     UPDATE_INTERVAL,
 )
 from .errors import LightElfLaserError
+from .discovery import run_scan
 from .hershey import list_fonts, render_text_segments
 from .preview import colorize_text_segments, render_segments_png
 from .protocol import (
@@ -255,6 +259,16 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.ota_version: int | None = None
         self.device_number: int | None = None
         self.user_number: int | None = None
+
+        # One explicit compatibility scan at a time. Its allowlisted report is
+        # retained across restarts so users can download diagnostics later.
+        self.discovery_report: dict[str, Any] | None = None
+        self.discovery_status = "idle"
+        self.discovery_step = ""
+        self.discovery_progress = 0
+        self.discovery_total = 0
+        self._discovery_task: asyncio.Task[None] | None = None
+        self._discovery_store = Store(hass, 1, f"{DOMAIN}.discovery_{entry.entry_id}")
 
         super().__init__(
             hass,
@@ -764,6 +778,10 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Poll connection/power state when connected; always refresh SVGs."""
+        if getattr(self, "discovery_status", "idle") == "running":
+            # The scan performs its own timed queries. Polling between a probe
+            # and its read-back would make mode-transition results ambiguous.
+            return dict(self.data or {})
         self.available_svgs = await self.hass.async_add_executor_job(self._scan_svg_dir)
         if self.selected_svg not in self.available_svgs:
             self.selected_svg = self.available_svgs[0] if self.available_svgs else None
@@ -835,8 +853,72 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     # -- control actions ----------------------------------------------------
 
+    async def async_load_discovery_report(self) -> None:
+        """Restore the most recent completed or partial scan after a restart."""
+        report = await self._discovery_store.async_load()
+        if not isinstance(report, dict):
+            return
+        self.discovery_report = report
+        self.discovery_status = str(report.get("status", "idle"))
+        if self.discovery_status == "running":
+            self.discovery_status = "interrupted"
+            report["status"] = "interrupted"
+        self.discovery_total = int(report.get("planned_steps", 0))
+        self.discovery_progress = len(report.get("steps", []))
+
+    async def _save_discovery_report(self, report: dict[str, Any]) -> None:
+        """Keep the latest scan in memory and in HA's private storage."""
+        detached = deepcopy(report)
+        self.discovery_report = detached
+        try:
+            await self._discovery_store.async_save(detached)
+        except Exception as err:
+            LOGGER.warning("Could not save compatibility scan: %s", type(err).__name__)
+
+    def _set_discovery_progress(self, number: int, total: int, step: str) -> None:
+        self.discovery_progress = number
+        self.discovery_total = total
+        self.discovery_step = step
+        self.async_update_listeners()
+
+    async def async_start_discovery_scan(self) -> None:
+        """Start the opt-in scan in the background; button presses return fast."""
+        if self._discovery_task is not None and not self._discovery_task.done():
+            raise LightElfLaserError("Compatibility scan is already running")
+        if not self.connection_enabled:
+            raise LightElfLaserError("Enable the BLE connection before running the scan")
+        self.discovery_status = "running"
+        self.discovery_step = "connecting"
+        self.discovery_progress = 0
+        self.discovery_total = 0
+        self.async_update_listeners()
+        self._discovery_task = self.hass.async_create_background_task(
+            self._async_run_discovery_scan(), f"{DOMAIN} compatibility scan"
+        )
+
+    async def _async_run_discovery_scan(self) -> None:
+        report = await run_scan(self)
+        self.discovery_status = str(report["status"])
+        self.discovery_step = ""
+        self.async_update_listeners()
+        if report["status"] != "cancelled":
+            await self.async_request_refresh()
+
+    async def async_stop_discovery_scan(self) -> None:
+        """Stop a running scan during integration unload."""
+        task = self._discovery_task
+        if task is None or task.done():
+            return
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
     async def async_set_connection(self, enabled: bool) -> None:
         """Hold or release the BLE connection (persisted across restarts)."""
+        if self.discovery_status == "running":
+            raise LightElfLaserError("Wait for the compatibility scan to finish")
         self.connection_enabled = enabled
         self.hass.config_entries.async_update_entry(
             self.config_entry,

@@ -56,6 +56,7 @@ _COMMAND_NAMES = {
     "E0E1E2E3": "query", "B0B1B2B3": "power", "C0C1C2C3": "mode",
     "00010203": "settings", "F0F1F2F3": "draw", "A0A1A2A3": "text",
     "70717073": "point_play", "D0D1D2D3": "effect",
+    "F0F1F200": "draw_new",
 }
 
 NATIVE_BUILTIN_FAMILIES = {
@@ -177,10 +178,14 @@ class LightElfBluetoothClient:
         self._history: deque[dict[str, Any]] = deque(maxlen=32)
         self._write_properties: list[str] = []
         self._last_profile: dict[str, str] | None = None
+        self._gatt_services: list[dict[str, Any]] = []
+        self._last_rssi_dbm: int | None = None
+        self._last_connect_ms: int | None = None
         self._settings_state: SettingsState | None = None
         self._mode_state: ModeState | None = None
         # Pace unacknowledged writes for reliable delivery through proxies.
         self._write_response = False
+        self.discovery_active = False
 
     @property
     def write_chunk_size(self) -> int:
@@ -196,6 +201,10 @@ class LightElfBluetoothClient:
             "connected": bool(self._client and self._client.is_connected),
             "can_send": self._can_send,
             "profile": self._last_profile,
+            "gatt_services": self._gatt_services,
+            "negotiated_mtu": self._safe_mtu(),
+            "last_rssi_dbm": self._last_rssi_dbm,
+            "last_connect_ms": self._last_connect_ms,
             "write_properties": self._write_properties,
             "write_with_response": self._write_response,
             "write_chunk_size": self.write_chunk_size,
@@ -204,6 +213,64 @@ class LightElfBluetoothClient:
             "last_reported_mode": self._mode_state_data(),
             "recent_operations": list(self._history),
         })
+
+    def _safe_mtu(self) -> int | None:
+        try:
+            value = getattr(self._client, "mtu_size", None)
+            return int(value) if value is not None else None
+        except Exception:
+            return None
+
+    async def async_probe_packets(
+        self,
+        packets: list[tuple[str, str]],
+        *,
+        first_delay: float = 0.35,
+        second_delay: float = 1.25,
+    ) -> dict[str, Any]:
+        """Send fixed discovery packets and retain both early and late read-backs.
+
+        The caller supplies only integration-owned test packets. The BLE lock
+        keeps normal traffic out of each packet/read-back sequence. Returned
+        metadata contains no packet contents or exception messages.
+        """
+        result: dict[str, Any] = {"writes": [], "readbacks": []}
+        async with self._lock:
+            try:
+                await self._ensure_connected_locked()
+            except Exception as err:
+                result["error_type"] = type(err).__name__
+                result["error_phase"] = "connect"
+                return result
+            for label, packet in packets:
+                try:
+                    await self._write_script_locked(packet)
+                except Exception as err:
+                    result["error_type"] = type(err).__name__
+                    result["error_phase"] = label
+                result["writes"].append({
+                    "label": label,
+                    **deepcopy(self._history[-1]),
+                })
+                if "error_type" in result:
+                    return result
+            for label, delay in (("early", first_delay), ("settled", second_delay)):
+                await asyncio.sleep(delay)
+                try:
+                    await self._query_locked()
+                    result["readbacks"].append({
+                        "phase": label,
+                        "result": "ok",
+                        **deepcopy(self._last_query or {}),
+                        "mode_state": self._mode_state_data(),
+                    })
+                except Exception as err:
+                    result["readbacks"].append({
+                        "phase": label,
+                        "result": "failed",
+                        "error_type": type(err).__name__,
+                    })
+            return result
 
     @property
     def device_id(self) -> str:
@@ -222,6 +289,25 @@ class LightElfBluetoothClient:
         except TypeError:
             service_iter = list(getattr(services_obj, "services", {}).values())
         available = {str(service.uuid).upper(): service for service in service_iter}
+        self._gatt_services = []
+        for service in service_iter[:32]:
+            item: dict[str, Any] = {"uuid": str(service.uuid).upper(), "characteristics": []}
+            try:
+                characteristics = getattr(service, "characteristics", []) or []
+                if isinstance(characteristics, dict):
+                    characteristics = characteristics.values()
+                item["characteristics"] = [
+                    {
+                        "uuid": str(char.uuid).upper(),
+                        "properties": sorted(str(prop) for prop in (getattr(char, "properties", []) or [])),
+                    }
+                    for char in list(characteristics)[:32]
+                ]
+            except Exception:
+                # GATT inventory is diagnostic only; it must never prevent a
+                # connection to an otherwise usable profile.
+                pass
+            self._gatt_services.append(item)
         for profile in UUID_PROFILES.values():
             if profile["service"].upper() in available:
                 return profile
@@ -312,6 +398,7 @@ class LightElfBluetoothClient:
             self._history.append(event)
 
     async def _query_locked(self) -> Any:
+        started = monotonic()
         random_bytes = [random.randrange(256) for _ in range(4)]
         command = query_command(random_bytes)
         self._reply_chunks = []
@@ -332,12 +419,18 @@ class LightElfBluetoothClient:
             if not parsed.challenge_ok:
                 raise LightElfBluetoothError("LightElf query challenge failed")
             self._remember_query_state(parsed)
+            self._last_query["query_attempts"] = attempt
+            self._last_query["query_duration_ms"] = round((monotonic() - started) * 1000)
+            self._last_query["notify_chunks"] = len(self._reply_chunks)
+            self._last_query["notify_chunk_lengths"] = [len(chunk) for chunk in self._reply_chunks]
             return parsed
         except Exception as err:
             self._history.append({
                 "time": datetime.now(timezone.utc).isoformat(),
                 "operation": "query_reply", "result": "failed",
                 "error_type": type(err).__name__,
+                "duration_ms": round((monotonic() - started) * 1000),
+                "notify_chunks": len(self._reply_chunks),
             })
             raise
         finally:
@@ -359,6 +452,10 @@ class LightElfBluetoothClient:
             "device_number": parsed.device_number,
             "user_number": parsed.user_number,
             "ota_version_raw": parsed.ota_version,
+            "reply_terminator": (
+                "query_envelope" if parsed.raw_hex.endswith("E4E5E6E7") else "other"
+            ),
+            "frame_layout": self._query_frame_layout(parsed.raw_hex),
         }
         try:
             state = parse_device_state(
@@ -379,6 +476,70 @@ class LightElfBluetoothClient:
             self._settings_state = state.settings
         if state.mode is not None:
             self._mode_state = state.mode
+        # Allowlist the useful state fields. Raw blocks, passwords, and saved
+        # user content stay out of diagnostics and discovery reports.
+        self._last_query["readback"] = {
+            "power_on": state.power.on if state.power is not None else None,
+            "settings": ({
+                "dmx_address": state.settings.dmx_address,
+                "channel": state.settings.channel,
+                "display_size": state.settings.display_size,
+                "xy": state.settings.xy,
+                "red": state.settings.red,
+                "green": state.settings.green,
+                "blue": state.settings.blue,
+                "light": state.settings.light,
+                "cfg": state.settings.cfg,
+                "power": state.settings.power,
+                "brightness": state.settings.brightness,
+                "grating": state.settings.grating,
+            } if state.settings is not None else None),
+            "draw": ({
+                "point_count": state.draw.point_count,
+                "save_tag": state.draw.save_tag,
+                "config_values": list(state.draw.config_values),
+            } if state.draw is not None else None),
+            "pis": ({
+                "count": state.pis.count,
+                "list_mode": state.pis.list_mode,
+                "indices": [entry.index for entry in state.pis.entries],
+            } if state.pis is not None else None),
+            "xy_config": ({
+                "save": state.xy_config.save,
+                "phase": state.xy_config.phase,
+                "x_big": state.xy_config.x_big,
+                "x_small": state.xy_config.x_small,
+                "y_big": state.xy_config.y_big,
+                "y_small": state.xy_config.y_small,
+            } if state.xy_config is not None else None),
+        }
+
+    @staticmethod
+    def _query_frame_layout(raw_hex: str) -> list[dict[str, Any]]:
+        """Describe known frame boundaries without exposing payload bytes."""
+        markers = (
+            ("power", "B0B1B2B3", "B4B5B6B7"),
+            ("mode", "C0C1C2C3", "C4C5C6C7"),
+            ("settings", "00010203", "04050607"),
+            ("xy_config", "10111213", "14151617"),
+            ("pis", "D0D1D2D3", "D4D5D6D7"),
+            ("draw_legacy", "F0F1F2F3", "F4F5F6F7"),
+            ("draw_new", "F0F1F200", "F6F7"),
+        )
+        layout = []
+        for name, start, end in markers:
+            position = raw_hex.find(start)
+            if position < 0:
+                continue
+            finish = raw_hex.find(end, position + len(start))
+            if finish < 0:
+                continue
+            layout.append({
+                "name": name,
+                "offset_bytes": position // 2,
+                "payload_bytes": (finish - position - len(start)) // 2,
+            })
+        return sorted(layout, key=lambda item: item["offset_bytes"])
 
     def _mode_state_data(self) -> dict[str, Any] | None:
         state = self._mode_state
@@ -420,12 +581,18 @@ class LightElfBluetoothClient:
         if self._client is not None and self._client.is_connected and self._can_send:
             return
 
+        started = monotonic()
         await self._disconnect_locked()
         ble_device = self._ble_device()
         if ble_device is None:
             raise LightElfBluetoothError(
                 f"{self.address} is not currently available through HA Bluetooth"
             )
+        try:
+            rssi = getattr(ble_device, "rssi", None)
+            self._last_rssi_dbm = int(rssi) if rssi is not None else None
+        except Exception:
+            self._last_rssi_dbm = None
 
         await close_stale_connections(ble_device)
         self._client = await establish_connection(
@@ -446,6 +613,7 @@ class LightElfBluetoothClient:
                 f"LightElf query challenge failed: token={parsed.challenge_token}"
             )
         self._can_send = True
+        self._last_connect_ms = round((monotonic() - started) * 1000)
 
     async def _send_commands(self, commands: list[str]) -> None:
         last_error: BaseException | None = None
@@ -537,6 +705,9 @@ class LightElfBluetoothClient:
     async def request(self, cmd: str, args: dict[str, Any] | None = None) -> dict[str, Any]:
         """Run one native Bluetooth command and return a service-style response."""
         args = args or {}
+
+        if self.discovery_active and cmd not in ("ping", "ble_state"):
+            raise LightElfBluetoothError("Compatibility scan is running; try again when it finishes")
 
         if cmd == "ping":
             available = self._ble_device() is not None

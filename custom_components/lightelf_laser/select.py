@@ -7,7 +7,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
-    COLOR_OPTIONS,
     MOTION_CUSTOM_LABEL,
     MOTION_MODE_LABELS,
     MOTION_MODES,

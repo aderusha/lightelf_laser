@@ -136,6 +136,13 @@ SENSORS: tuple[LightElfSensorDescription, ...] = (
         entity_registry_enabled_default=False,
         value_fn=_write_delay,
     ),
+    LightElfSensorDescription(
+        key="compatibility_scan_status",
+        name="Compatibility scan status",
+        icon="mdi:flask-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda c: c.discovery_status,
+    ),
 )
 
 
@@ -178,3 +185,14 @@ class LightElfDiagnosticSensor(LightElfLaserEntity, SensorEntity):
     def native_value(self) -> str | int | None:
         """Return the current diagnostic value."""
         return self.entity_description.value_fn(self.coordinator)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str | int] | None:
+        """Expose scan progress without putting the full report in entity state."""
+        if self.entity_description.key != "compatibility_scan_status":
+            return None
+        return {
+            "step": self.coordinator.discovery_step,
+            "current_step": self.coordinator.discovery_progress,
+            "total": self.coordinator.discovery_total,
+        }

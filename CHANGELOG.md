@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0
+
+- Add an opt-in **Run compatibility scan** button and status sensor. One scan
+  exercises animation selection, drawing mode transitions, fixed SVG and text
+  samples, power-on ordering, legacy and newer drawing frames, and scrolling
+  text order/encoding variants. It records timed command results and early and
+  settled device read-backs in downloadable diagnostics.
+- Keep the latest scan report across Home Assistant restarts. The report uses
+  fixed test content and excludes raw replies, challenge tokens, passwords,
+  Bluetooth addresses, and user text or files.
+- Send power-off twice at the end and report whether the projector confirmed
+  output off. The scan does not judge visual output; a brief visual observation
+  or video is still useful for hardware compatibility work.
+
+The scan changes the projected content while it runs. It is initiated only by
+the button, never automatically during setup or normal operation.
+
 ## 0.3.0
 
 - Add downloadable diagnostics with device identity, inferred firmware

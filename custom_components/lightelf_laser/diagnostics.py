@@ -29,7 +29,7 @@ async def async_get_config_entry_diagnostics(
     integration = await async_get_integration(hass, DOMAIN)
     coordinator = getattr(entry, "runtime_data", None)
     result: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "integration_version": integration.version,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "loaded": coordinator is not None,
@@ -62,5 +62,7 @@ async def async_get_config_entry_diagnostics(
                 else "unverified" if features else "identity_unknown"
             ),
         },
+        "compatibility_scan": getattr(coordinator, "discovery_report", None),
+        "compatibility_scan_status": getattr(coordinator, "discovery_status", "idle"),
     })
     return result
