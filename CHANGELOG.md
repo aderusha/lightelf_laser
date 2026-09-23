@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.1
+
+- Select Hand-drawn mode before sending SVG, shape, or static-text frames to
+  type-2 projectors using the older command format. This follows the mode order
+  that changed category successfully in a 0.4.0 compatibility scan.
+- For scrolling text on the same hardware, select Text mode before loading the
+  text and select it again afterward to start playback. Other projector types
+  retain their existing command order.
+
+The scan verified category read-backs, but cannot tell whether each image was
+projected. Visual confirmation on the affected hardware is still needed.
+
 ## 0.4.0
 
 - Add an opt-in **Run compatibility scan** button and status sensor. One scan

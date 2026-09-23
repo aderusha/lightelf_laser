@@ -11,7 +11,7 @@ from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, call, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -299,6 +299,82 @@ class DiagnosticTests(unittest.IsolatedAsyncioTestCase):
         coordinator.async_display_native_animation = AsyncMock()
         await coordinator._reapply_sound_if_playing()
         coordinator.async_display_native_animation.assert_awaited_once()
+
+    async def test_type2_draws_enter_hand_drawn_mode_before_frame(self):
+        mode8 = protocol.mode_command(
+            mode=8, color=9, size_percent=100,
+            speed_percent=50, distance_percent=50,
+        )
+        for kind in (2, 0):
+            with self.subTest(device_type=kind):
+                cls = coordinator_module.LightElfLaserDataUpdateCoordinator
+                coordinator = object.__new__(cls)
+                coordinator.client = SimpleNamespace(
+                    _features=protocol.resolve_device_features(kind, 2),
+                    request=AsyncMock(),
+                )
+                coordinator.hass = SimpleNamespace(
+                    async_add_executor_job=AsyncMock(return_value="FAKE_FRAME")
+                )
+                coordinator.async_request_refresh = AsyncMock()
+                coordinator._motion_cnf_values = lambda: None
+                coordinator.draw_scale = 100
+                coordinator.selected_svg = "star.svg"
+                coordinator.svg_dir = Path("/unused")
+                coordinator.svg_color = "original"
+                coordinator.builtin_family = "Line"
+                coordinator.builtin_index = 0
+                coordinator.builtin_color = "original"
+                coordinator._builtin_frames = {"Line": [[[0, 0, 7, 3]]]}
+                coordinator.text_message = "H"
+                coordinator.text_color = "white"
+                coordinator.text_font = "futural"
+                coordinator.text_size = 150
+                coordinator.text_y = 0
+                for display in (
+                    coordinator.async_display_svg,
+                    coordinator.async_display_shape,
+                    coordinator._display_static_text,
+                ):
+                    coordinator.client.request.reset_mock()
+                    await display()
+                    expected = [call("power", {"on": True})]
+                    if kind == 2:
+                        expected.append(call("raw", {"hex": mode8}))
+                    expected.append(call("raw", {"hex": "FAKE_FRAME"}))
+                    self.assertEqual(coordinator.client.request.call_args_list, expected)
+
+    async def test_type2_scroll_selects_text_mode_on_both_sides_of_a0(self):
+        cls = coordinator_module.LightElfLaserDataUpdateCoordinator
+        for kind in (2, 0):
+            with self.subTest(device_type=kind):
+                coordinator = object.__new__(cls)
+                coordinator.client = SimpleNamespace(
+                    _features=protocol.resolve_device_features(kind, 2),
+                    request=AsyncMock(),
+                )
+                coordinator.hass = SimpleNamespace(
+                    async_add_executor_job=AsyncMock(return_value="FAKE_TEXT")
+                )
+                coordinator.async_request_refresh = AsyncMock()
+                coordinator.text_message = "I"
+                coordinator.text_color = "white"
+                coordinator.text_font = "futural"
+                coordinator.scroll_speed = 50
+                await coordinator._display_scroll_text(255)
+                text_mode = protocol.mode_command(
+                    mode=4, color=9, size_percent=100,
+                    speed_percent=50, distance_percent=50,
+                    run_direction=255, arb_play=True,
+                )
+                expected = [call("power", {"on": True})]
+                if kind == 2:
+                    expected.append(call("raw", {"hex": text_mode}))
+                expected.extend((
+                    call("raw", {"hex": "FAKE_TEXT"}),
+                    call("raw", {"hex": text_mode}),
+                ))
+                self.assertEqual(coordinator.client.request.call_args_list, expected)
 
     async def test_fixed_scan_plan_uses_no_user_content(self):
         async def executor(function, *args):

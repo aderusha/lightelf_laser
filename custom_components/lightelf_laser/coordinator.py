@@ -731,6 +731,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.draw_scale_factor,
         )
         await self.client.request("power", {"on": True})
+        await self._select_draw_mode_for_type2()
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
@@ -1101,6 +1102,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.draw_scale_factor,
         )
         await self.client.request("power", {"on": True})
+        await self._select_draw_mode_for_type2()
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
@@ -1152,6 +1154,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.draw_scale_factor,
         )
         await self.client.request("power", {"on": True})
+        await self._select_draw_mode_for_type2()
         await self.client.request("raw", {"hex": command})
         self.is_on = True
         self._native_animation_active = False
@@ -1202,7 +1205,9 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         Sends the A0 text packet first (loads the text), THEN the C0 mode-4
         command with run direction + speed (triggers the firmware scroll). That
-        order matters: C0 first scrolls the device's previously-stored text.
+        order matters on the reference projector: C0 first scrolls the device's
+        previously-stored text. Type-2 old-format projectors require mode 4
+        before A0 as well, so send C0 both before and after the text packet.
         Colors cycle per stroke (rainbow), matching the app. Uses a fixed,
         proven glyph scale (SCROLL_UNIT) so coordinates stay in device range.
         """
@@ -1223,6 +1228,8 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             arb_play=True,
         )
         await self.client.request("power", {"on": True})
+        if self._requires_type2_category_selection:
+            await self.client.request("raw", {"hex": c0})
         await self.client.request("raw", {"hex": a0})
         await self.client.request("raw", {"hex": c0})
         self.is_on = True
@@ -1230,3 +1237,21 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._active_show_program = None
         self._last_draw = None
         await self.async_request_refresh()
+
+    @property
+    def _requires_type2_category_selection(self) -> bool:
+        """Apply the category transition observed on type-2 old firmware."""
+        features = self.client._features
+        return bool(
+            features is not None
+            and features.device_type == 2
+            and not features.cmd_new_type
+        )
+
+    async def _select_draw_mode_for_type2(self) -> None:
+        """Enter Hand-drawn before sending F0 frames on affected projectors."""
+        if self._requires_type2_category_selection:
+            await self.client.request("raw", {"hex": mode_command(
+                mode=8, color=9, size_percent=100,
+                speed_percent=50, distance_percent=50,
+            )})
