@@ -11,7 +11,7 @@ from pathlib import Path
 import sys
 from types import ModuleType, SimpleNamespace
 import unittest
-from unittest.mock import AsyncMock, call, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,11 +64,11 @@ def load_modules():
         modules[name] = module
     with patch.dict(sys.modules, modules):
         return tuple(importlib.import_module(f"{PACKAGE}.{name}") for name in (
-            "protocol", "bluetooth_client", "diagnostics", "coordinator", "discovery"
+            "const", "protocol", "bluetooth_client", "diagnostics", "coordinator", "discovery"
         ))
 
 
-protocol, bluetooth, diagnostics, coordinator_module, discovery = load_modules()
+const, protocol, bluetooth, diagnostics, coordinator_module, discovery = load_modules()
 
 
 def make_client():
@@ -275,6 +275,42 @@ class DiagnosticTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(coordinator_module.LightElfLaserError):
             await coordinator.async_set_show_program(9)
         coordinator.client.request.assert_not_awaited()
+
+    async def test_dmx_mode_can_be_selected_and_read_back(self):
+        cls = coordinator_module.LightElfLaserDataUpdateCoordinator
+        coordinator = object.__new__(cls)
+        coordinator.client = SimpleNamespace(request=AsyncMock())
+        coordinator.sound_reactive = False
+        coordinator.sound_sensitivity = 100
+        coordinator.data = {"mode_state": {"mode": 3}}
+        coordinator.async_set_updated_data = Mock()
+        await coordinator.async_set_show_program(0)
+        expected_mode = protocol.mode_command(
+            mode=0, color=9, size_percent=100, speed_percent=50,
+            distance_percent=50, playback="auto", sound_percent=100,
+        )
+        self.assertEqual(coordinator.client.request.call_args_list, [
+            call("power", {"on": True}),
+            call("raw", {"hex": expected_mode}),
+        ])
+        self.assertEqual(coordinator._active_show_program, 0)
+        self.assertFalse(coordinator._native_animation_active)
+        self.assertEqual(
+            coordinator.async_set_updated_data.call_args.args[0]["mode_state"]["mode"],
+            0,
+        )
+        coordinator.data = {"mode_state": {"mode": 0}}
+        self.assertEqual(coordinator.current_show_program, 0)
+        self.assertIn(("DMX (external control)", 0), const.SHOW_PROGRAMS)
+        coordinator.client.request.reset_mock()
+        await coordinator.async_set_show_program(8)
+        self.assertEqual(coordinator._active_show_program, 8)
+        self.assertEqual(coordinator.client.request.call_args_list[-1], call(
+            "raw", {"hex": protocol.mode_command(
+                mode=8, color=9, size_percent=100, speed_percent=50,
+                distance_percent=50, playback="auto", sound_percent=100,
+            )},
+        ))
 
     async def test_sound_adjustment_preserves_show_program(self):
         cls = coordinator_module.LightElfLaserDataUpdateCoordinator

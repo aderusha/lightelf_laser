@@ -353,14 +353,12 @@ class LightElfMountOrientationSelect(LightElfLaserEntity, SelectEntity):
 
 
 class LightElfShowProgramSelect(LightElfLaserEntity, SelectEntity):
-    """Switch the projector's onboard SHOW program (mirrors the panel menu).
+    """Switch the projector's DMX or onboard SHOW program.
 
     The back-panel up/down + 7-seg SHOW 0-7 menu is the firmware curMode (1-8).
-    Picking a program sends a C0 mode command, so the projector plays that
-    category from its own stored content - the same thing the buttons do. The
-    active program is read back from the device query, so turning the panel knob
-    updates this too. Shows blank when the device is in a non-SHOW mode (DMX,
-    other playback modes).
+    DMX is curMode 0. Picking an option sends a C0 mode command; selecting a
+    SHOW program after DMX returns the projector to onboard playback. The
+    active mode is read back from the device query, so panel changes update it.
     """
 
     _attr_name = "Show program"
@@ -373,7 +371,7 @@ class LightElfShowProgramSelect(LightElfLaserEntity, SelectEntity):
 
     @property
     def current_option(self) -> str | None:
-        """Return the active SHOW program label, or None if outside the menu."""
+        """Return the active DMX/SHOW label, or None for another mode."""
         return _SHOW_MODE_TO_LABEL.get(self.coordinator.current_show_program)
 
     async def async_select_option(self, option: str) -> None:

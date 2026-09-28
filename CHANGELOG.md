@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Add **DMX (external control)** to the Show program picker. Choosing it sends
+  the projector's DMX mode command; choosing any other program returns to
+  onboard playback. The picker reflects mode changes reported by the device.
+- Keep **DMX address** as the separate start-channel setting. Entering DMX mode
+  does not change the address or create a DMX signal.
+
 ## 0.4.1
 
 - Select Hand-drawn mode before sending SVG, shape, or static-text frames to

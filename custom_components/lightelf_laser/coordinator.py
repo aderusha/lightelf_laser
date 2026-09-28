@@ -324,15 +324,15 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @property
     def current_show_program(self) -> int | None:
-        """The device's active SHOW program as a curMode (1-8), or None.
+        """The device's DMX/SHOW mode as a curMode (0-8), or None.
 
         Read from the query reply's mode byte, so it tracks the physical
-        back-panel SHOW menu as well as HA-issued switches. ``None`` when the
-        device is in a mode outside the SHOW menu (DMX or other playback modes).
+        back-panel SHOW menu as well as HA-issued switches. Mode 0 is external
+        DMX control; ``None`` means another playback mode is active.
         """
         data = self.data or {}
         mode = (data.get("mode_state") or {}).get("mode")
-        if isinstance(mode, int) and 1 <= mode <= 8:
+        if isinstance(mode, int) and 0 <= mode <= 8:
             return mode
         return None
 
@@ -677,15 +677,14 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.async_request_refresh()
 
     async def async_set_show_program(self, curmode: int) -> None:
-        """Switch the onboard SHOW program (mirrors the back-panel SHOW menu).
+        """Select external DMX control or an onboard SHOW program.
 
-        SHOW N on the device is curMode N+1. Sends a plain C0 mode command so the
-        projector plays that program category from its own stored per-mode
-        content - exactly what the up/down buttons do. Sound-reactive state is
-        carried along for the modes that support voice control.
+        DMX is curMode 0; SHOW N on the device is curMode N+1. Sends a plain C0
+        mode command. Sound-reactive state is carried along for the modes that
+        support voice control.
         """
-        if curmode not in range(1, 9):
-            raise LightElfLaserError("Show program must be between 1 and 8")
+        if curmode not in range(0, 9):
+            raise LightElfLaserError("Show program must be between 0 and 8")
         command = mode_command(
             mode=curmode,
             color=9,
@@ -698,9 +697,8 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         await self.client.request("power", {"on": True})
         await self.client.request("raw", {"hex": command})
         self.is_on = True
-        # Per the manual, voice control applies to SHOW 0/1/2/4/5 = curMode
-        # 1/2/3/5/6; treat those as an active firmware effect so a sound toggle
-        # re-applies. Text/Programming/Graffiti don't react to sound.
+        # Voice control applies to SHOW 0/1/2/4/5 = curMode 1/2/3/5/6.
+        # DMX, Text, Programming, and Graffiti don't react to sound.
         self._native_animation_active = curmode in (1, 2, 3, 5, 6)
         self._active_show_program = curmode
         self._last_draw = None
@@ -836,7 +834,7 @@ class LightElfLaserDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if self._active_show_program is not None and mode_state is not None:
             reported_mode = mode_state.get("mode")
             self._active_show_program = (
-                reported_mode if isinstance(reported_mode, int) and 1 <= reported_mode <= 8
+                reported_mode if isinstance(reported_mode, int) and 0 <= reported_mode <= 8
                 else None
             )
             self._native_animation_active = reported_mode in (1, 2, 3, 5, 6)

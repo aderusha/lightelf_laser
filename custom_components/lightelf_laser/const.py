@@ -53,9 +53,10 @@ PLATFORMS: tuple[Platform, ...] = (
 # firmware curMode, offset by one: SHOW N == curMode N+1. Selecting a program
 # sends a plain C0 mode command, so the projector plays that category from its
 # own stored per-mode content - the same thing the panel buttons do. The query
-# reply's mode byte reads the active program back. Labels follow the EY003-L
-# manual's SHOW 0-7 descriptions.
+# reply's mode byte reads the active program back. Mode 0 is DMX; the remaining
+# labels follow the EY003-L manual's SHOW 0-7 descriptions.
 SHOW_PROGRAMS: tuple[tuple[str, int], ...] = (
+    ("DMX (external control)", 0),
     ("Random (all)", 1),
     ("Line shapes", 2),
     ("Animations", 3),

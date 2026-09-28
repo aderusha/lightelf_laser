@@ -126,10 +126,17 @@ These shape your own drawn content — SVGs, vector text, and built-in shapes
 Size, Motion, and the FX knobs persist across restarts and re-apply to the
 current drawing the moment you change them.
 
-## DMX Address
+## DMX Mode and Address
 
-If you run the projector on a DMX-512 lighting rig, **DMX address**
+If you run the projector on a DMX-512 lighting rig, choose **DMX (external
+control)** from **Show program** to hand playback to the DMX input. Choose any
+other Show program to return to onboard playback. The picker follows the
+projector's reported mode, including changes made from its panel.
+
+**DMX address**
 (`number.lightelf_laser_dmx_address`) sets its start address / base channel
 (1-512). It is written to the device and read back from it, so you can patch the
-fixture from Home Assistant instead of the device menu. It has no effect unless
-the projector is receiving DMX.
+fixture from Home Assistant instead of the device menu. Selecting DMX mode does
+not change this address or send DMX channel values. With no incoming DMX signal,
+the projector may show no output. Aim it at a safe surface before switching
+modes, especially when a console is connected.

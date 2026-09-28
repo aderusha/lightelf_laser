@@ -19,7 +19,7 @@ Control projector power, SVGs, text, built-in shapes, and firmware-native animat
 - **Local BLE control** with live device-state polling.
 - **Downloadable diagnostics** and an opt-in compatibility scan to help
   troubleshoot hardware variants.
-- **Show program selection** for the projector's onboard playback categories.
+- **Show program selection** for onboard playback or external DMX control.
 - **SVG drawing** with a native Home Assistant upload flow.
 - **Vector text** with bundled Hershey fonts, solid colors, or rainbow strokes.
 - **Firmware scrolling text** without host-side frame streaming.
