@@ -69,6 +69,8 @@ The integration seeds a few starter SVGs into Home Assistant local media on firs
 
 This controls laser hardware. Aim the projector at a safe projection surface, avoid eye exposure, and follow the safety instructions for your device.
 
+**Compatibility warning:** This integration has been tested only on the Eytse EY003-L (Type 0 / protocol v2). Other devices may work, but untested variants could be damaged, including their galvos. Use at your own risk.
+
 ## License
 
 The integration code is released under the [MIT License](LICENSE).
